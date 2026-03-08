@@ -5,6 +5,8 @@ import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import api from "@/lib/api";
 
 interface MediaFile {
   id: string;
@@ -78,7 +80,9 @@ interface SignupFlowProps {
 export const SignupFlow = ({ onComplete }: SignupFlowProps = {}) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isComplete, setIsComplete] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const { signup } = useAuth();
 
   const [signupData, setSignupData] = useState<SignupData>({
     personalInfo: {
@@ -129,19 +133,98 @@ export const SignupFlow = ({ onComplete }: SignupFlowProps = {}) => {
     }
   };
 
-  const handleSubmit = () => {
-    // Here you would typically send the data to your backend
-    console.log("Signup completed with data:", signupData);
-    setIsComplete(true);
-    toast({
-      title: "Profile Created Successfully! 🎉",
-      description: "You can now start discovering potential flatmates.",
-    });
+  const handleSubmit = async () => {
+    const { personalInfo, housingDetails } = signupData;
+    setIsSubmitting(true);
 
-    // Call onComplete callback if provided
-    setTimeout(() => {
-      onComplete?.();
-    }, 2000);
+    try {
+      // 1. Create account
+      await signup({
+        name: personalInfo.name,
+        email: personalInfo.email,
+        password: personalInfo.password,
+        phone: personalInfo.phone,
+      });
+
+      // 2. Update profile with age, gender, city, search_type
+      await api.put("/profile", {
+        age: parseInt(personalInfo.age) || undefined,
+        gender: personalInfo.gender || undefined,
+        search_type: housingDetails.searchType,
+      });
+
+      // 3. Add job experiences (parallel)
+      if (personalInfo.jobExperiences.length > 0) {
+        await Promise.all(
+          personalInfo.jobExperiences
+            .filter(j => j.company || j.position)
+            .map((j, idx) =>
+              api.post("/profile/jobs", {
+                company_name: j.company || undefined,
+                position_name: j.position || undefined,
+                from_year: j.fromYear || undefined,
+                till_year: j.currentlyWorking ? undefined : (j.tillYear || undefined),
+                currently_working: j.currentlyWorking,
+                display_order: idx + 1,
+              })
+            )
+        );
+      }
+
+      // 4. Add education experiences (parallel)
+      if (personalInfo.educationExperiences.length > 0) {
+        await Promise.all(
+          personalInfo.educationExperiences
+            .filter(e => e.institution || e.degree)
+            .map((e, idx) =>
+              api.post("/profile/education", {
+                institution_name: e.institution || undefined,
+                degree_name: e.degree || undefined,
+                start_year: e.startYear || undefined,
+                end_year: e.endYear || undefined,
+                display_order: idx + 1,
+              })
+            )
+        );
+      }
+
+      // 5. Create flat listing if user has flat details
+      const { flatDetails, searchType } = housingDetails;
+      if ((searchType === "flatmate" || searchType === "both") && flatDetails.address) {
+        const furnishingMap: Record<string, string> = {
+          "fully-furnished": "furnished",
+          "semi-furnished": "semifurnished",
+          "non-furnished": "unfurnished",
+        };
+        await api.post("/flats", {
+          address: flatDetails.address,
+          city: "", // Address entered as full string; city/state parsing TBD
+          state: "",
+          furnishing_type: furnishingMap[flatDetails.flatFurnishing] || "unfurnished",
+          description: flatDetails.description || undefined,
+          is_published: true,
+        });
+      }
+
+      setIsComplete(true);
+      toast({
+        title: "Profile Created Successfully! 🎉",
+        description: "You can now start discovering potential flatmates.",
+      });
+
+      setTimeout(() => {
+        onComplete?.();
+      }, 2000);
+    } catch (err: any) {
+      const message = err?.response?.data?.message || "Registration failed. Please try again.";
+      toast({
+        title: "Signup Failed",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const progressValue = (currentStep / 2) * 100;
@@ -213,6 +296,7 @@ export const SignupFlow = ({ onComplete }: SignupFlowProps = {}) => {
                 onUpdate={handleHousingDetailsUpdate}
                 onSubmit={handleSubmit}
                 onBack={handleBack}
+                isSubmitting={isSubmitting}
               />
             )}
           </CardContent>

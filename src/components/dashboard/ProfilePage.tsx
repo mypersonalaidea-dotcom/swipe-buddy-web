@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { habitCategories, getCategoryForHabit, getHabitIcon } from "@/constants/habits";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -23,11 +23,19 @@ import {
 } from "@/components/ui/dialog";
 import {
   User, Phone, Mail, Briefcase, BookOpen, Home, MapPin,
-  Edit2, Save, X, Plus, Trash2, Camera, Heart, Bookmark, Share2, Copy, Check, DoorOpen, Building2
+  Edit2, Save, X, Plus, Trash2, Camera, Heart, Bookmark, Share2, Copy, Check, DoorOpen, Building2, Loader2
 } from "lucide-react";
 import { MediaUpload } from "@/components/ui/media-upload";
 import { mockProfiles } from "@/data/mockProfiles";
 import { Profile } from "@/components/profile/ProfileCard";
+import {
+  useMyProfile, useUpdateProfile,
+  useMyJobs, useAddJob, useUpdateJob, useDeleteJob,
+  useMyEducation, useAddEducation, useUpdateEducation, useDeleteEducation,
+  useMyHabits, useUpdateHabits,
+} from "@/hooks/useProfile";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCompanies, usePositions, useInstitutions, useDegrees } from "@/hooks/useMasterData";
 
 interface JobExperience {
   id: string;
@@ -92,69 +100,14 @@ interface UserProfile {
   myHabits: string[];
 }
 
-// Mock user data - this would come from your auth/database
-const mockUserProfile: UserProfile = {
-  name: "John Doe",
-  age: "28",
-  gender: "male",
-  phone: "9876543210",
-  email: "john.doe@example.com",
-  city: "Mumbai",
-  state: "Maharashtra",
-  profilePictureUrl: "",
-  jobExperiences: [
-    {
-      id: "1",
-      company: "Tech Corp",
-      position: "Software Engineer",
-      fromYear: "2020",
-      tillYear: "",
-      currentlyWorking: true
-    }
-  ],
-  educationExperiences: [
-    {
-      id: "1",
-      institution: "IIT Mumbai",
-      degree: "B.Tech Computer Science",
-      startYear: "2016",
-      endYear: "2020"
-    }
-  ],
-  searchType: "both",
-  flatDetails: {
-    address: "402, Sunshine Apartments, Lokhandwala Complex, Andheri West, Mumbai - 400053",
-    flatType: "2bhk",
-    flatFurnishing: "semi-furnished",
-    rooms: [
-      {
-        id: "1",
-        roomType: "private",
-        quantity: "2",
-        rent: "18000",
-        securityDeposit: "2 Month",
-        brokerage: "none|15 Day",
-        availableFrom: "2024-02-15",
-        amenities: ["WiFi", "Parking"],
-        media: []
-      },
-      {
-        id: "2",
-        roomType: "shared",
-        quantity: "1",
-        rent: "10000",
-        securityDeposit: "1 Month",
-        brokerage: "1 Month",
-        availableFrom: "2024-02-01",
-        amenities: ["WiFi"],
-        media: []
-      }
-    ],
-    commonAmenities: ["WiFi", "Parking", "Gym"],
-    description: "Spacious 3BHK apartment in a prime location with great connectivity. Looking for working professionals or students.",
-    commonMedia: []
-  },
-  myHabits: ["Non-Smoker", "Early Riser", "Vegetarian"]
+// API-backed profile placeholder (populated via useEffect once data loads)
+const emptyProfile: UserProfile = {
+  name: "", age: "", gender: "", phone: "", email: "",
+  city: "", state: "", profilePictureUrl: "",
+  jobExperiences: [], educationExperiences: [],
+  searchType: "flat",
+  flatDetails: { address: "", flatType: "", flatFurnishing: "", rooms: [], commonAmenities: [], description: "", commonMedia: [] },
+  myHabits: []
 };
 
 
@@ -176,13 +129,75 @@ const roomTypeLabels: Record<string, string> = {
 };
 
 export const ProfilePage = () => {
-  const [profile, setProfile] = useState<UserProfile>(mockUserProfile);
+  // ---- API hooks ----
+  const { data: apiProfile, isLoading: profileLoading } = useMyProfile();
+  const { data: apiJobs } = useMyJobs();
+  const { data: apiEducation } = useMyEducation();
+  const { data: apiHabits } = useMyHabits();
+  const updateProfileMutation = useUpdateProfile();
+  const addJobMutation = useAddJob();
+  const updateJobMutation = useUpdateJob();
+  const deleteJobMutation = useDeleteJob();
+  const addEduMutation = useAddEducation();
+  const updateEduMutation = useUpdateEducation();
+  const deleteEduMutation = useDeleteEducation();
+  const updateHabitsMutation = useUpdateHabits();
+
+  // ---- Master data hooks ----
+  const { data: masterCompanies = [] } = useCompanies();
+  const { data: masterPositions = [] } = usePositions();
+  const { data: masterInstitutions = [] } = useInstitutions();
+  const { data: masterDegrees = [] } = useDegrees();
+
+  const { user: authUser } = useAuth();
+
+  // Helper: convert API profile → local UserProfile shape
+  const apiToLocal = (): UserProfile => ({
+    name: apiProfile?.name ?? "",
+    age: apiProfile?.age?.toString() ?? "",
+    gender: apiProfile?.gender ?? "",
+    phone: apiProfile?.phone ?? "",
+    email: apiProfile?.email ?? "",
+    city: apiProfile?.city ?? "",
+    state: apiProfile?.state ?? "",
+    profilePictureUrl: apiProfile?.profile_picture_url ?? "",
+    jobExperiences: (apiJobs ?? []).map(j => ({
+      id: j.id,
+      company: j.company?.name ?? j.company_name ?? "",
+      position: j.position?.name ?? j.position_name ?? "",
+      fromYear: j.from_year ?? "",
+      tillYear: j.till_year ?? "",
+      currentlyWorking: j.currently_working,
+    })),
+    educationExperiences: (apiEducation ?? []).map(e => ({
+      id: e.id,
+      institution: e.institution?.name ?? e.institution_name ?? "",
+      degree: e.degree?.common_name ?? e.degree_name ?? "",
+      startYear: e.start_year ?? "",
+      endYear: e.end_year ?? "",
+    })),
+    searchType: (apiProfile?.search_type ?? "flat") as "flat" | "flatmate" | "both",
+    flatDetails: { address: "", flatType: "", flatFurnishing: "", rooms: [], commonAmenities: [], description: "", commonMedia: [] },
+    myHabits: (apiHabits ?? []).map(h => h.habit.label),
+  });
+
+  const [profile, setProfile] = useState<UserProfile>(emptyProfile);
   const [isEditing, setIsEditing] = useState(false);
-  const [editedProfile, setEditedProfile] = useState<UserProfile>(mockUserProfile);
-  const [savedProfileIds, setSavedProfileIds] = useState<string[]>(["1", "3"]); // Mock saved profiles
+  const [editedProfile, setEditedProfile] = useState<UserProfile>(emptyProfile);
+  const [savedProfileIds, setSavedProfileIds] = useState<string[]>([]);
   const [, setSearchParams] = useSearchParams();
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+
+  // Sync API data into local state once loaded
+  useEffect(() => {
+    if (apiProfile) {
+      const local = apiToLocal();
+      setProfile(local);
+      setEditedProfile(local);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiProfile, apiJobs, apiEducation, apiHabits]);
 
   // Custom Degree Dialog State
   const [showAddDegreeDialog, setShowAddDegreeDialog] = useState(false);
@@ -200,80 +215,39 @@ export const ProfilePage = () => {
 
   const { toast } = useToast();
 
-  const [companiesDb, setCompaniesDb] = useState<BrandOption[]>([
-    { id: "Google", name: "Google", aliases: ["Alphabet"], logo: "https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" },
-    { id: "TCS", name: "TCS", aliases: ["Tata Consultancy Services"], logo: "https://upload.wikimedia.org/wikipedia/commons/b/b1/Tata_Consultancy_Services_Logo.svg" },
-    { id: "Microsoft", name: "Microsoft", logo: "https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg" },
-  ]);
-  const [schoolsDb, setSchoolsDb] = useState<BrandOption[]>([
-    { id: "IIT Delhi", name: "IIT Delhi", aliases: ["Indian Institute of Technology Delhi"], logo: "https://upload.wikimedia.org/wikipedia/en/1/1d/Indian_Institute_of_Technology_Delhi_Logo.svg" },
-    { id: "NIT Trichy", name: "NIT Trichy", aliases: ["National Institute of Technology"], logo: "https://upload.wikimedia.org/wikipedia/en/c/c4/National_Institute_of_Technology%2C_Tiruchirappalli_Logo.png" },
-  ]);
-  const [positionOptions, setPositionOptions] = useState<string[]>([
-    "Academic Counselor", "Account Executive", "Account Manager", "Accountant", "Advisor",
-    "Analyst", "Android Developer", "Animator", "Apprentice", "Art Director",
-    "Associate", "Associate Product Manager (APM)", "Auditor",
-    "Backend Developer", "Board Member", "Brand Manager", "Business Analyst",
-    "Business Development Associate", "Business Development Manager",
-    "CEO", "CFO", "CHRO", "CIO", "CISO", "CMO", "COO", "CPO", "CSM", "CTO",
-    "Chartered Accountant (CA)", "Chief Financial Officer", "Clinical Research Associate",
-    "Cloud Architect", "Cloud Engineer", "Co-Founder", "Company Secretary (CS)",
-    "Compensation & Benefits Analyst", "Compliance Officer", "Consultant",
-    "Consultant (Independent)", "Content Strategist", "Content Writer", "Controller",
-    "Copywriter", "Corporate Lawyer", "Creative Director",
-    "Data Analyst", "Data Engineer", "Data Scientist", "Database Administrator (DBA)",
-    "Design Lead", "DevOps Engineer", "Digital Marketing Manager",
-    "Director of Engineering", "Director of Product", "Distinguished Engineer", "Doctor",
-    "Editor", "Embedded Systems Engineer", "Engineering Manager", "Entrepreneur",
-    "Fellow", "Finance Manager", "Financial Analyst", "Founder", "Freelancer",
-    "Frontend Developer", "Full Stack Developer",
-    "Game Developer", "General Counsel", "General Manager", "Graduate Trainee",
-    "Graphic Designer", "Group Product Manager", "Growth Manager",
-    "HR Business Partner", "HR Executive", "HR Manager",
-    "IM", "Instructional Designer", "Interaction Designer", "Intern",
-    "Investment Analyst", "Investment Banker", "iOS Developer",
-    "Journalist",
-    "Key Account Manager",
-    "Lab Technician", "Learning & Development Manager", "Lecturer",
-    "Legal Associate", "Legal Counsel", "Logistics Manager",
-    "Machine Learning Engineer", "Management Consultant", "Management Trainee",
-    "Managing Director", "Marketing Analyst", "Marketing Executive", "Marketing Manager",
-    "Medical Officer", "Mobile Developer",
-    "Network Engineer", "Nurse",
-    "Operations Analyst", "Operations Manager",
-    "Paralegal", "Partner", "People Operations Manager", "Performance Marketer",
-    "Pharmacist", "Photographer", "Platform Engineer", "Portfolio Manager",
-    "President", "Principal Consultant", "Principal Engineer",
-    "Process Improvement Manager", "Procurement Manager",
-    "Product Designer", "Product Manager", "Professor",
-    "QA Analyst", "QA Engineer",
-    "Recruiter", "Research Associate", "Research Scientist", "Risk Analyst",
-    "SDE 1", "SDE 2", "SDE 3", "SDET", "SEO Specialist",
-    "SRE", "SWE", "SWE 1", "SWE 2", "SWE 3",
-    "Sales Associate", "Sales Engineer", "Sales Executive", "Sales Manager",
-    "Security Analyst", "Security Engineer",
-    "Senior Associate", "Senior Consultant", "Senior Engineering Manager",
-    "Senior Product Manager", "Site Reliability Engineer",
-    "Social Media Manager", "Software Architect", "Software Engineer",
-    "Staff Engineer", "Strategy Analyst", "Supply Chain Manager", "Systems Engineer",
-    "Talent Acquisition Specialist", "Tax Consultant", "Teacher", "Team Lead",
-    "Technical Lead", "Test Engineer", "Trainee", "Trainer", "Treasury Analyst",
-    "UI Designer", "UI/UX Developer", "UX Designer", "UX Researcher",
-    "VP of Engineering", "VP of Product", "Vice President",
-    "Video Editor", "Videographer", "Visual Designer",
-    "Warehouse Manager", "Web Developer",
-    "Other"
-  ]);
-  const [degreeOptions, setDegreeOptions] = useState<string[]>([
-    "10th Standard", "12th Standard", "B.A.", "B.Arch", "B.Com", "B.Des", "B.E.", "B.Ed", "B.F.A.", "B.P.Ed",
-    "B.Pharm", "B.Plan", "B.Sc", "B.Sc. Nursing", "B.Tech", "BAMS", "BBA", "BCA", "BDS", "BHM / BHMCT", "BHMS",
-    "BMS", "BPT", "BSW", "BVSc & AH", "CA", "CMA", "CS", "Diploma", "LLB", "LLM", "M.A.", "M.Arch", "M.Com",
-    "M.Des", "M.E.", "M.Pharm", "M.Phil", "M.Sc", "M.Tech", "MBA", "MBBS", "MCA", "MD", "MDS", "MFA", "MPT",
-    "MS", "MSW", "PGDM", "Ph.D.", "Pharm.D", "Other"
-  ]);
+  // Derive BrandOption arrays from master API data (falls back to local state for custom entries)
+  const [extraCompanies, setExtraCompanies] = useState<BrandOption[]>([]);
+  const [extraSchools, setExtraSchools] = useState<BrandOption[]>([]);
+  const companiesDb: BrandOption[] = [
+    ...masterCompanies.map(c => ({ id: c.id, name: c.name, logo: c.logo_url ?? undefined })),
+    ...extraCompanies,
+  ];
+  const setCompaniesDb = (updater: (prev: BrandOption[]) => BrandOption[]) =>
+    setExtraCompanies(prev => updater([...masterCompanies.map(c => ({ id: c.id, name: c.name, logo: c.logo_url ?? undefined })), ...prev]).filter(c => !masterCompanies.find(m => m.id === c.id)));
 
-  // Mock user ID - in real app this would come from auth
-  const currentUserId = "current-user";
+  const schoolsDb: BrandOption[] = [
+    ...masterInstitutions.map(i => ({ id: i.id, name: i.name, logo: i.logo_url ?? undefined })),
+    ...extraSchools,
+  ];
+  const setSchoolsDb = (updater: (prev: BrandOption[]) => BrandOption[]) =>
+    setExtraSchools(prev => updater([...masterInstitutions.map(i => ({ id: i.id, name: i.name, logo: i.logo_url ?? undefined })), ...prev]).filter(i => !masterInstitutions.find(m => m.id === i.id)));
+
+  const positionOptions: string[] = masterPositions.length > 0
+    ? [...masterPositions.map(p => p.name), "Other"]
+    : ["Software Engineer", "Product Manager", "Designer", "Analyst", "Other"];
+
+  const degreeOptions: string[] = masterDegrees.length > 0
+    ? [...masterDegrees.map(d => d.common_name), "Other"]
+    : ["B.Tech", "MBA", "M.Tech", "B.Com", "B.A.", "Ph.D.", "Other"];
+
+  // setPositionOptions / setDegreeOptions — kept as no-ops for compatibility with dialog handlers below
+  const setPositionOptions = (_: any) => {};
+  const setDegreeOptions = (_: any) => {};
+
+
+
+  // currentUserId from real auth
+  const currentUserId = authUser?.id ?? "";
   const shareUrl = `${window.location.origin}/profile/${currentUserId}`;
 
   const handleCopyLink = async () => {
@@ -318,13 +292,88 @@ export const ProfilePage = () => {
     setIsEditing(false);
   };
 
-  const handleSave = () => {
-    setProfile({ ...editedProfile });
-    setIsEditing(false);
-    toast({
-      title: "Profile Updated",
-      description: "Your profile has been saved successfully.",
-    });
+  const handleSave = async () => {
+    try {
+      // 1. Update basic profile fields
+      await updateProfileMutation.mutateAsync({
+        name: editedProfile.name,
+        age: editedProfile.age ? parseInt(editedProfile.age) as any : undefined,
+        gender: editedProfile.gender as any,
+        city: editedProfile.city,
+        state: editedProfile.state,
+        search_type: editedProfile.searchType as any,
+      });
+
+      // 2. Sync jobs: delete removed, update existing, add new
+      const origJobIds = (apiJobs ?? []).map(j => j.id);
+      const editedJobIds = editedProfile.jobExperiences.filter(j => origJobIds.includes(j.id)).map(j => j.id);
+      // Delete removed jobs
+      for (const origId of origJobIds) {
+        if (!editedProfile.jobExperiences.find(j => j.id === origId)) {
+          await deleteJobMutation.mutateAsync(origId);
+        }
+      }
+      // Update existing jobs
+      for (const j of editedProfile.jobExperiences.filter(j => origJobIds.includes(j.id))) {
+        await updateJobMutation.mutateAsync({
+          jobId: j.id,
+          company_name: j.company || undefined,
+          position_name: j.position || undefined,
+          from_year: j.fromYear || undefined,
+          till_year: j.currentlyWorking ? undefined : (j.tillYear || undefined),
+          currently_working: j.currentlyWorking,
+        });
+      }
+      // Add new jobs
+      for (const j of editedProfile.jobExperiences.filter(j => !origJobIds.includes(j.id))) {
+        if (j.company || j.position) {
+          await addJobMutation.mutateAsync({
+            company_name: j.company || undefined,
+            position_name: j.position || undefined,
+            from_year: j.fromYear || undefined,
+            till_year: j.currentlyWorking ? undefined : (j.tillYear || undefined),
+            currently_working: j.currentlyWorking,
+          });
+        }
+      }
+
+      // 3. Sync education: delete removed, update existing, add new
+      const origEduIds = (apiEducation ?? []).map(e => e.id);
+      for (const origId of origEduIds) {
+        if (!editedProfile.educationExperiences.find(e => e.id === origId)) {
+          await deleteEduMutation.mutateAsync(origId);
+        }
+      }
+      for (const e of editedProfile.educationExperiences.filter(e => origEduIds.includes(e.id))) {
+        await updateEduMutation.mutateAsync({
+          eduId: e.id,
+          institution_name: e.institution || undefined,
+          degree_name: e.degree || undefined,
+          start_year: e.startYear || undefined,
+          end_year: e.endYear || undefined,
+        });
+      }
+      for (const e of editedProfile.educationExperiences.filter(e => !origEduIds.includes(e.id))) {
+        if (e.institution || e.degree) {
+          await addEduMutation.mutateAsync({
+            institution_name: e.institution || undefined,
+            degree_name: e.degree || undefined,
+            start_year: e.startYear || undefined,
+            end_year: e.endYear || undefined,
+          });
+        }
+      }
+
+      setProfile({ ...editedProfile });
+      setIsEditing(false);
+      toast({ title: "Profile Updated", description: "Your profile has been saved successfully." });
+    } catch (err: any) {
+      toast({
+        title: "Save Failed",
+        description: err?.response?.data?.message || "Could not save profile. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const updateField = (field: keyof UserProfile, value: any) => {

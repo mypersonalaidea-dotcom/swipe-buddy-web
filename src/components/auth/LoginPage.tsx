@@ -3,8 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Phone, Lock, Eye, EyeOff, Mail } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface LoginPageProps {
   onLogin: () => void;
@@ -12,14 +13,14 @@ interface LoginPageProps {
 }
 
 export const LoginPage = ({ onLogin, onSignup }: LoginPageProps) => {
-  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const { login, isLoading } = useAuth();
   const { toast } = useToast();
 
   const handleLogin = async () => {
-    if (!phone || !password) {
+    if (!email || !password) {
       toast({
         title: "Error",
         description: "Please fill in all fields",
@@ -28,33 +29,26 @@ export const LoginPage = ({ onLogin, onSignup }: LoginPageProps) => {
       return;
     }
 
-    if (phone.length !== 10) {
-      toast({
-        title: "Error",
-        description: "Please enter a valid 10-digit phone number",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    
-    // Mock login delay
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      await login(email, password);
       toast({
         title: "Welcome back! 🎉",
         description: "You have successfully logged in.",
       });
       onLogin();
-    }, 1000);
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.message || "Invalid email or password.";
+      toast({
+        title: "Login Failed",
+        description: message,
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleForgotPassword = () => {
-    toast({
-      title: "Reset Link Sent",
-      description: "Password reset instructions have been sent to your registered email.",
-    });
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") handleLogin();
   };
 
   return (
@@ -65,22 +59,20 @@ export const LoginPage = ({ onLogin, onSignup }: LoginPageProps) => {
           <p className="text-muted-foreground">Sign in to find your perfect flatmate</p>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Phone Number Input */}
+          {/* Email Input */}
           <div className="space-y-2">
-            <Label htmlFor="phone">Phone Number</Label>
+            <Label htmlFor="email">Email</Label>
             <div className="relative">
-              <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                id="phone"
-                type="tel"
-                placeholder="Enter 10-digit phone number"
-                value={phone}
-                onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, '').slice(0, 10);
-                  setPhone(value);
-                }}
+                id="email"
+                type="email"
+                placeholder="your@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={handleKeyDown}
                 className="pl-10"
-                maxLength={10}
+                autoComplete="email"
               />
             </div>
           </div>
@@ -96,7 +88,9 @@ export const LoginPage = ({ onLogin, onSignup }: LoginPageProps) => {
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={handleKeyDown}
                 className="pl-10 pr-10"
+                autoComplete="current-password"
               />
               <button
                 type="button"
@@ -106,17 +100,6 @@ export const LoginPage = ({ onLogin, onSignup }: LoginPageProps) => {
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
-          </div>
-
-          {/* Forgot Password */}
-          <div className="text-right">
-            <button
-              type="button"
-              onClick={handleForgotPassword}
-              className="text-sm text-primary hover:underline"
-            >
-              Forgot Password?
-            </button>
           </div>
 
           {/* Login Button */}
@@ -138,21 +121,6 @@ export const LoginPage = ({ onLogin, onSignup }: LoginPageProps) => {
               <span className="bg-background px-2 text-muted-foreground">or</span>
             </div>
           </div>
-
-          {/* Google Sign In */}
-          <Button
-            onClick={() => {
-              toast({
-                title: "Google Sign In",
-                description: "Google authentication will be available soon!",
-              });
-            }}
-            variant="outline"
-            className="w-full h-12"
-          >
-            <Mail className="w-4 h-4 mr-2" />
-            Continue with Google
-          </Button>
 
           {/* Signup Link */}
           <div className="text-center space-y-2">

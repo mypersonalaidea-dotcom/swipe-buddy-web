@@ -49,6 +49,7 @@ interface HousingDetailsStepProps {
   onUpdate: (data: HousingDetailsData) => void;
   onSubmit: () => void;
   onBack: () => void;
+  isSubmitting?: boolean;
 }
 
 const roomAmenitiesList = [
@@ -67,7 +68,7 @@ const roomTypeLabels = {
   "studio": "Studio"
 };
 
-export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack }: HousingDetailsStepProps) => {
+export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitting }: HousingDetailsStepProps) => {
   const handleInputChange = (field: keyof HousingDetailsData, value: any) => {
     onUpdate({ ...data, [field]: value });
   };
@@ -567,11 +568,11 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack }: Housing
         </Button>
         <Button
           onClick={onSubmit}
-          disabled={!isValid}
+          disabled={!isValid || isSubmitting}
           className="flex-1 h-12"
           variant="gradient"
         >
-          Create Account
+          {isSubmitting ? "Creating Account..." : "Create Account"}
         </Button>
       </div>
     </div>

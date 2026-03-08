@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
 import { habitCategories, getCategoryForHabit } from "@/constants/habits";
-import { ChevronLeft, ChevronRight, SlidersHorizontal, ChevronDown, Home, Users, Heart, Building2, Briefcase, GraduationCap } from "lucide-react";
+import { ChevronLeft, ChevronRight, SlidersHorizontal, ChevronDown, Home, Users, Heart, Building2, Briefcase, GraduationCap, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ProfileCard } from "@/components/profile/ProfileCard";
-import { mockProfiles } from "@/data/mockProfiles";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { useFlats } from "@/hooks/useFlats";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -65,7 +65,41 @@ export const HomePage = () => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { toast } = useToast();
 
-  // --- User account search type (from profile) ---
+  // --- Real flat profiles from API ---
+  const { data: flatsData, isLoading: flatsLoading } = useFlats();
+  const profiles = (flatsData ?? []).map(flat => ({
+    id: flat.id,
+    name: flat.user?.name ?? "Unknown",
+    age: 0,
+    city: flat.city ?? "Unknown",
+    state: flat.state ?? "",
+    gender: "",
+    profilePicture: flat.user?.profile_picture_url ?? "",
+    searchType: "flatmate" as const,
+    myHabits: [] as string[],
+    lookingForHabits: [] as string[],
+    jobExperiences: [] as { id: string; company: string; position: string; fromYear: string; tillYear: string; currentlyWorking: boolean }[],
+    educationExperiences: [] as { id: string; institution: string; degree: string; startYear: string; endYear: string }[],
+    flatDetails: {
+      address: flat.address ?? "",
+      furnishingType: flat.furnishing_type ?? "",
+      commonAmenities: flat.common_amenities?.map(a => a.amenity.name) ?? [],
+      commonPhotos: flat.media?.filter(m => m.media_type === "image").map(m => m.media_url) ?? [],
+      rooms: (flat.rooms ?? []).map(r => ({
+        id: r.id,
+        type: r.room_type,
+        rent: `₹${r.rent?.toLocaleString()}/mo`,
+        available: r.available_count,
+        securityDeposit: `${r.security_deposit} mo`,
+        brokerage: r.brokerage ? `${r.brokerage} days` : undefined,
+        availableFrom: r.available_from ?? "",
+        furnishingType: r.furnishing_type ?? flat.furnishing_type ?? "",
+        amenities: r.room_amenities?.map(a => a.amenity.name) ?? [],
+        photos: r.media?.filter(m => m.media_type === "image").map(m => m.media_url) ?? [],
+      })),
+    },
+  }));
+
   const [userSearchType] = useState<"flat" | "flatmate" | "both">("both");
   const [hasFlatDetails, setHasFlatDetails] = useState(
     () => userSearchType === "flatmate" || userSearchType === "both"
@@ -274,7 +308,7 @@ export const HomePage = () => {
 
   // --- Navigation ---
   const handleNext = () => {
-    if (isAnimating || currentIndex >= mockProfiles.length - 1) return;
+    if (isAnimating || currentIndex >= profiles.length - 1) return;
     setIsAnimating(true);
     setAnimationDirection("left");
     setTimeout(() => { setCurrentIndex(prev => prev + 1); setIsAnimating(false); setAnimationDirection(null); }, 300);
@@ -1004,21 +1038,30 @@ export const HomePage = () => {
         </div>
 
         <div className="flex-1 h-full flex items-center justify-center py-8 px-2">
-          {mockProfiles[currentIndex] && (
+          {flatsLoading ? (
+            <div className="flex flex-col items-center gap-3 text-muted-foreground">
+              <Loader2 className="w-8 h-8 animate-spin" />
+              <p className="text-sm">Finding matches...</p>
+            </div>
+          ) : profiles[currentIndex] ? (
             <div className={animationDirection === "left" ? "animate-swipe-out-left w-full" : animationDirection === "right" ? "animate-swipe-out-right w-full" : "animate-slide-in w-full"}>
-              <ProfileCard profile={mockProfiles[currentIndex]} />
+              <ProfileCard profile={profiles[currentIndex]} />
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-3 text-muted-foreground">
+              <p className="text-sm">No listings found. Check back soon!</p>
             </div>
           )}
         </div>
 
         <div className="flex-shrink-0 w-12 flex items-center justify-center">
-          <Button variant="outline" size="icon" className="h-12 w-12 rounded-full shadow-card" onClick={handleNext} disabled={currentIndex >= mockProfiles.length - 1 || isAnimating}>
+          <Button variant="outline" size="icon" className="h-12 w-12 rounded-full shadow-card" onClick={handleNext} disabled={currentIndex >= profiles.length - 1 || isAnimating}>
             <ChevronRight className="h-6 w-6" />
           </Button>
         </div>
 
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-sm text-muted-foreground">
-          {currentIndex + 1} / {mockProfiles.length}
+          {currentIndex + 1} / {profiles.length}
         </div>
       </div>
     </div>
