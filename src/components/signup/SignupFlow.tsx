@@ -63,6 +63,8 @@ interface SignupData {
     propertyMoveInDate?: string;
     flatDetails: {
       address: string;
+      city: string;
+      state: string;
       flatType: string;
       flatFurnishing: string;
       rooms: RoomDetails[];
@@ -103,6 +105,8 @@ export const SignupFlow = ({ onComplete }: SignupFlowProps = {}) => {
       propertyMoveInDate: new Date().toISOString().split('T')[0],
       flatDetails: {
         address: "",
+        city: "",
+        state: "",
         flatType: "",
         flatFurnishing: "",
         rooms: [],
@@ -200,8 +204,8 @@ export const SignupFlow = ({ onComplete }: SignupFlowProps = {}) => {
         };
         await api.post("/flats", {
           address: flatDetails.address,
-          city: "", // Address entered as full string; city/state parsing TBD
-          state: "",
+          city: flatDetails.city,
+          state: flatDetails.state,
           furnishing_type: furnishingMap[flatDetails.flatFurnishing] || "unfurnished",
           description: flatDetails.description || undefined,
           is_published: true,

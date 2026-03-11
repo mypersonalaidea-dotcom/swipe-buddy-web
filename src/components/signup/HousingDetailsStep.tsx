@@ -35,6 +35,8 @@ interface HousingDetailsData {
   // For flat owners
   flatDetails: {
     address: string;
+    city: string;
+    state: string;
     flatType: string;
     flatFurnishing: string;
     rooms: RoomDetails[];
@@ -242,10 +244,31 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
               <Label htmlFor="flat-address">Flat Address</Label>
               <Input
                 id="flat-address"
-                placeholder="123 Main St, New York, NY 10001"
+                placeholder="123 Main St, Sector 69"
                 value={data.flatDetails.address}
                 onChange={(e) => handleFlatDetailsChange('address', e.target.value)}
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="flat-city">City <span className="text-destructive">*</span></Label>
+                <Input
+                  id="flat-city"
+                  placeholder="e.g. Gurugram"
+                  value={data.flatDetails.city}
+                  onChange={(e) => handleFlatDetailsChange('city', e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="flat-state">State <span className="text-destructive">*</span></Label>
+                <Input
+                  id="flat-state"
+                  placeholder="e.g. Haryana"
+                  value={data.flatDetails.state}
+                  onChange={(e) => handleFlatDetailsChange('state', e.target.value)}
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
