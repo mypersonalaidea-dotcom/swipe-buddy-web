@@ -15,7 +15,7 @@ interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (phone: string, password: string) => Promise<void>;
   signup: (data: {
     name: string;
     email: string;
@@ -71,10 +71,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [clearAuth]);
 
   const login = useCallback(
-    async (email: string, password: string) => {
+    async (phone: string, password: string) => {
       setIsLoading(true);
       try {
-        const res = await api.post("/auth/login", { email, password });
+        const res = await api.post("/auth/login", { phone, password });
         const { user, token } = res.data.data;
         persistAuth(user, token);
       } finally {

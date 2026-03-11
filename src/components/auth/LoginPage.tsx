@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { Phone, Lock, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -13,14 +13,14 @@ interface LoginPageProps {
 }
 
 export const LoginPage = ({ onLogin, onSignup }: LoginPageProps) => {
-  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const { login, isLoading } = useAuth();
   const { toast } = useToast();
 
   const handleLogin = async () => {
-    if (!email || !password) {
+    if (!phone || !password) {
       toast({
         title: "Error",
         description: "Please fill in all fields",
@@ -30,7 +30,7 @@ export const LoginPage = ({ onLogin, onSignup }: LoginPageProps) => {
     }
 
     try {
-      await login(email, password);
+      await login(phone, password);
       toast({
         title: "Welcome back! 🎉",
         description: "You have successfully logged in.",
@@ -40,7 +40,7 @@ export const LoginPage = ({ onLogin, onSignup }: LoginPageProps) => {
       const message =
         err?.friendlyMessage ||
         err?.response?.data?.message ||
-        "Invalid email or password.";
+        "Invalid phone number or password.";
       toast({
         title: "Login Failed",
         description: message,
@@ -61,20 +61,20 @@ export const LoginPage = ({ onLogin, onSignup }: LoginPageProps) => {
           <p className="text-muted-foreground">Sign in to find your perfect flatmate</p>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Email Input */}
+          {/* Phone Input */}
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="phone">Phone Number</Label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                id="email"
-                type="email"
-                placeholder="your@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="phone"
+                type="tel"
+                placeholder="e.g. +91 9876543210"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
                 onKeyDown={handleKeyDown}
                 className="pl-10"
-                autoComplete="email"
+                autoComplete="tel"
               />
             </div>
           </div>
