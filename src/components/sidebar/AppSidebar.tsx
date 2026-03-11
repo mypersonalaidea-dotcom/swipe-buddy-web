@@ -1,6 +1,7 @@
 import { Home, MessageCircle, User, HelpCircle, LogOut } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Sidebar,
   SidebarContent,
@@ -38,8 +39,10 @@ const menuItems = [
 export const AppSidebar = ({ activeView, onViewChange }: AppSidebarProps) => {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
   const handleLogout = () => {
+    logout(); // clears swipebuddy_token + swipebuddy_user from localStorage
     navigate("/");
   };
 
