@@ -49,6 +49,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUserState(user);
   }, []);
 
+  /**
+   * Clear local auth state without a hard page reload.
+   * Called both by logout() and the swipebuddy:unauthorized event.
+   */
+  const clearAuth = useCallback(() => {
+    localStorage.removeItem("swipebuddy_token");
+    localStorage.removeItem("swipebuddy_user");
+    setToken(null);
+    setUserState(null);
+  }, []);
+
+  // Listen for 401 events fired by the API interceptor (non-auth endpoints)
+  // and soft-clear the session without refreshing the page.
+  useEffect(() => {
+    const handleUnauthorized = () => clearAuth();
+    window.addEventListener("swipebuddy:unauthorized", handleUnauthorized);
+    return () => {
+      window.removeEventListener("swipebuddy:unauthorized", handleUnauthorized);
+    };
+  }, [clearAuth]);
+
   const login = useCallback(
     async (email: string, password: string) => {
       setIsLoading(true);
@@ -79,12 +100,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   );
 
   const logout = useCallback(() => {
-    localStorage.removeItem("swipebuddy_token");
-    localStorage.removeItem("swipebuddy_user");
-    setToken(null);
-    setUserState(null);
-    window.location.href = "/";
-  }, []);
+    clearAuth();
+  }, [clearAuth]);
 
   const setUser = useCallback((user: AuthUser) => {
     setUserState(user);

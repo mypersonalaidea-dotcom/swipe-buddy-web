@@ -38,7 +38,9 @@ export const LoginPage = ({ onLogin, onSignup }: LoginPageProps) => {
       onLogin();
     } catch (err: any) {
       const message =
-        err?.response?.data?.message || "Invalid email or password.";
+        err?.friendlyMessage ||
+        err?.response?.data?.message ||
+        "Invalid email or password.";
       toast({
         title: "Login Failed",
         description: message,
