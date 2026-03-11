@@ -21,6 +21,8 @@ interface AuthContextType {
     email: string;
     password: string;
     phone: string;
+    age: number;
+    gender: string;
   }) => Promise<AuthUser>;
   logout: () => void;
   setUser: (user: AuthUser) => void;
@@ -85,7 +87,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   );
 
   const signup = useCallback(
-    async (data: { name: string; email: string; password: string; phone: string }) => {
+    async (data: { name: string; email: string; password: string; phone: string; age: number; gender: string }) => {
       setIsLoading(true);
       try {
         const res = await api.post("/auth/signup", data);

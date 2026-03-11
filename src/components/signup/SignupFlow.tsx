@@ -138,12 +138,14 @@ export const SignupFlow = ({ onComplete }: SignupFlowProps = {}) => {
     setIsSubmitting(true);
 
     try {
-      // 1. Create account
+      // 1. Create account (with all mandatory fields)
       await signup({
         name: personalInfo.name,
         email: personalInfo.email,
         password: personalInfo.password,
         phone: personalInfo.phone,
+        age: parseInt(personalInfo.age) || 0,
+        gender: personalInfo.gender,
       });
 
       // 2. Update profile with age, gender, city, search_type
