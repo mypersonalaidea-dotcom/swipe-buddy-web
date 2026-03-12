@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Upload, User, Phone, Plus, Trash2, Briefcase, BookOpen, Lock, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { Upload, User, Phone, Mail, Plus, Trash2, Briefcase, BookOpen, Lock, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { BrandMultiSelect, BrandOption } from "@/components/ui/brand-multi-select";
 import {
@@ -44,6 +44,7 @@ interface PersonalInfoData {
   confirmPassword: string;
   profilePicture: File | null;
   phoneVerified: boolean;
+  emailVerified: boolean;
   jobExperiences: JobExperience[];
   educationExperiences: EducationExperience[];
 }
@@ -321,6 +322,32 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
     }, 2000);
   };
 
+  const handleVerifyEmail = () => {
+    if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Mock sending OTP
+    toast({
+      title: "OTP Sent! 📧",
+      description: `Verification code sent to ${data.email}. Demo OTP: 123456`,
+    });
+
+    // For demo, automatically mark as verified after 2 seconds
+    setTimeout(() => {
+      handleInputChange('emailVerified', true);
+      toast({
+        title: "Email Verified! ✅",
+        description: "Your email has been verified successfully.",
+      });
+    }, 2000);
+  };
+
   const isPasswordValid = Boolean(
     data.password &&
     data.password.length >= 8 &&
@@ -540,14 +567,37 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
         )}
 
         <div className="space-y-2">
-          <Label htmlFor="email">Email Address (Optional)</Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="your.email@example.com"
-            value={data.email}
-            onChange={(e) => handleInputChange('email', e.target.value)}
-          />
+          <Label htmlFor="email" className="flex items-center gap-2">
+            <Mail className="w-4 h-4" />
+            Email
+          </Label>
+          <div className="flex gap-2">
+            <Input
+              id="email"
+              type="email"
+              placeholder="Ex: your.email@example.com"
+              value={data.email}
+              onChange={(e) => {
+                handleInputChange('email', e.target.value);
+                if (data.emailVerified && e.target.value !== data.email) {
+                  handleInputChange('emailVerified', false);
+                }
+              }}
+              className="flex-1"
+            />
+            <Button
+              onClick={handleVerifyEmail}
+              disabled={!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email) || data.emailVerified}
+              variant={data.emailVerified ? "default" : "outline"}
+              className="whitespace-nowrap"
+              type="button"
+            >
+              {data.emailVerified ? "✅ Verified" : "Verify"}
+            </Button>
+          </div>
+          {data.emailVerified && (
+            <p className="text-sm text-green-600">Email verified successfully!</p>
+          )}
         </div>
 
         {/* Job Experience Section */}

@@ -55,6 +55,7 @@ interface SignupData {
     confirmPassword: string;
     profilePicture: File | null;
     phoneVerified: boolean;
+    emailVerified: boolean;
     jobExperiences: JobExperience[];
     educationExperiences: EducationExperience[];
   };
@@ -97,6 +98,7 @@ export const SignupFlow = ({ onComplete }: SignupFlowProps = {}) => {
       confirmPassword: "",
       profilePicture: null,
       phoneVerified: false,
+      emailVerified: false,
       jobExperiences: [],
       educationExperiences: []
     },
