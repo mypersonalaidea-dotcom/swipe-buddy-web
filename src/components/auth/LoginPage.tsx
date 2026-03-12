@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Phone, Lock, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,6 +17,7 @@ export const LoginPage = ({ onLogin, onSignup }: LoginPageProps) => {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [countryCode, setCountryCode] = useState("+91");
   const { login, isLoading } = useAuth();
   const { toast } = useToast();
 
@@ -53,6 +55,25 @@ export const LoginPage = ({ onLogin, onSignup }: LoginPageProps) => {
     if (e.key === "Enter") handleLogin();
   };
 
+  const countryCodes = [
+    { code: "+1", flag: "🇺🇸", country: "USA" },
+    { code: "+33", flag: "🇫🇷", country: "France" },
+    { code: "+44", flag: "🇬🇧", country: "UK" },
+    { code: "+49", flag: "🇩🇪", country: "Germany" },
+    { code: "+61", flag: "🇦🇺", country: "Australia" },
+    { code: "+65", flag: "🇸🇬", country: "Singapore" },
+    { code: "+81", flag: "🇯🇵", country: "Japan" },
+    { code: "+82", flag: "🇰🇷", country: "S. Korea" },
+    { code: "+86", flag: "🇨🇳", country: "China" },
+    { code: "+91", flag: "🇮🇳", country: "India" },
+    { code: "+92", flag: "🇵🇰", country: "Pakistan" },
+    { code: "+94", flag: "🇱🇰", country: "Sri Lanka" },
+    { code: "+880", flag: "🇧🇩", country: "Bangladesh" },
+    { code: "+966", flag: "🇸🇦", country: "Saudi Arabia" },
+    { code: "+971", flag: "🇦🇪", country: "UAE" },
+    { code: "+977", flag: "🇳🇵", country: "Nepal" },
+  ];
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md mx-auto shadow-card animate-fade-in">
@@ -64,18 +85,35 @@ export const LoginPage = ({ onLogin, onSignup }: LoginPageProps) => {
           {/* Phone Input */}
           <div className="space-y-2">
             <Label htmlFor="phone">Phone Number</Label>
-            <div className="relative">
-              <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                id="phone"
-                type="tel"
-                placeholder="e.g. +91 9876543210"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="pl-10"
-                autoComplete="tel"
-              />
+            <div className="flex gap-2">
+              <Select value={countryCode} onValueChange={setCountryCode}>
+                <SelectTrigger className="w-[100px] shrink-0">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-background/95 backdrop-blur-sm border border-border/50 max-h-60 overflow-y-auto z-50 shadow-lg rounded-lg">
+                  {countryCodes.map(({ code, flag }) => (
+                    <SelectItem
+                      key={code}
+                      value={code}
+                      className="cursor-pointer hover:bg-accent/50 focus:bg-accent/70 transition-colors duration-200 rounded-sm mx-1"
+                    >
+                      {flag} {code}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="relative flex-1">
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="Enter phone number"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  onKeyDown={handleKeyDown}
+                  maxLength={10}
+                  autoComplete="tel"
+                />
+              </div>
             </div>
           </div>
 

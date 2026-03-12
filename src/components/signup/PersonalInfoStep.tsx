@@ -67,6 +67,7 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [countryCode, setCountryCode] = useState("+91");
 
   // Custom Degree Dialog State
   const [showAddDegreeDialog, setShowAddDegreeDialog] = useState(false);
@@ -508,6 +509,42 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
             Phone Number <span className="text-red-500">*</span>
           </Label>
           <div className="flex gap-2">
+            <Select
+              value={countryCode}
+              onValueChange={setCountryCode}
+            >
+              <SelectTrigger className="w-[100px] shrink-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-background/95 backdrop-blur-sm border border-border/50 max-h-60 overflow-y-auto z-50 shadow-lg rounded-lg">
+                {[
+                  { code: "+1", flag: "🇺🇸", country: "USA" },
+                  { code: "+33", flag: "🇫🇷", country: "France" },
+                  { code: "+44", flag: "🇬🇧", country: "UK" },
+                  { code: "+49", flag: "🇩🇪", country: "Germany" },
+                  { code: "+61", flag: "🇦🇺", country: "Australia" },
+                  { code: "+65", flag: "🇸🇬", country: "Singapore" },
+                  { code: "+81", flag: "🇯🇵", country: "Japan" },
+                  { code: "+82", flag: "🇰🇷", country: "S. Korea" },
+                  { code: "+86", flag: "🇨🇳", country: "China" },
+                  { code: "+91", flag: "🇮🇳", country: "India" },
+                  { code: "+92", flag: "🇵🇰", country: "Pakistan" },
+                  { code: "+94", flag: "🇱🇰", country: "Sri Lanka" },
+                  { code: "+880", flag: "🇧🇩", country: "Bangladesh" },
+                  { code: "+966", flag: "🇸🇦", country: "Saudi Arabia" },
+                  { code: "+971", flag: "🇦🇪", country: "UAE" },
+                  { code: "+977", flag: "🇳🇵", country: "Nepal" },
+                ].map(({ code, flag, country }) => (
+                  <SelectItem
+                    key={code}
+                    value={code}
+                    className="cursor-pointer hover:bg-accent/50 focus:bg-accent/70 transition-colors duration-200 rounded-sm mx-1"
+                  >
+                    {flag} {code}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Input
               id="phone"
               type="tel"
