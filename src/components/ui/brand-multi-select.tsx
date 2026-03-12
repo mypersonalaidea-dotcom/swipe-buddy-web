@@ -30,7 +30,7 @@ export interface BrandOption {
 }
 
 interface BrandMultiSelectProps {
-    label: string;
+    label: React.ReactNode;
     icon?: React.ReactNode;
     placeholder?: string;
     options: BrandOption[];

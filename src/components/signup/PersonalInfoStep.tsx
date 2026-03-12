@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SearchableSelect } from "@/components/ui/searchable-select";
@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Upload, User, Phone, Mail, Plus, Trash2, Briefcase, BookOpen, Lock, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { Upload, User, Users, Phone, Mail, Calendar, CalendarArrowUp, CalendarArrowDown, UserCheck, GraduationCap, Plus, Trash2, Briefcase, BookOpen, Lock, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { BrandMultiSelect, BrandOption } from "@/components/ui/brand-multi-select";
 import {
@@ -15,7 +15,14 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+  InputOTPSeparator,
+} from "@/components/ui/input-otp";
 
 interface JobExperience {
   id: string;
@@ -296,6 +303,79 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
     return Array.from({ length: maxYear - startYear + 1 }, (_, i) => (startYear + i).toString());
   };
 
+  // OTP Dialog State
+  const [otpDialogOpen, setOtpDialogOpen] = useState(false);
+  const [otpValue, setOtpValue] = useState("");
+  const [otpType, setOtpType] = useState<"phone" | "email">("phone");
+  const [otpCountdown, setOtpCountdown] = useState(0);
+  const [otpError, setOtpError] = useState("");
+  const [otpVerifying, setOtpVerifying] = useState(false);
+
+  // Countdown timer for resend
+  useEffect(() => {
+    if (otpCountdown <= 0) return;
+    const timer = setTimeout(() => setOtpCountdown(otpCountdown - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [otpCountdown]);
+
+  const openOtpDialog = (type: "phone" | "email") => {
+    setOtpType(type);
+    setOtpValue("");
+    setOtpError("");
+    setOtpDialogOpen(true);
+    setOtpCountdown(30);
+
+    const target = type === "phone" ? data.phone : data.email;
+    toast({
+      title: type === "phone" ? "OTP Sent! 📱" : "OTP Sent! 📧",
+      description: `Verification code sent to ${target}. Demo OTP: 123456`,
+    });
+  };
+
+  const handleOtpVerify = () => {
+    if (otpValue.length !== 6) {
+      setOtpError("Please enter the complete 6-digit OTP");
+      return;
+    }
+
+    // Mock: accept 123456 as valid OTP
+    if (otpValue !== "123456") {
+      setOtpError("Invalid OTP. Please try again. (Demo OTP: 123456)");
+      return;
+    }
+
+    setOtpVerifying(true);
+    setTimeout(() => {
+      if (otpType === "phone") {
+        handleInputChange('phoneVerified', true);
+        toast({
+          title: "Phone Verified! ✅",
+          description: "Your phone number has been verified successfully.",
+        });
+      } else {
+        handleInputChange('emailVerified', true);
+        toast({
+          title: "Email Verified! ✅",
+          description: "Your email has been verified successfully.",
+        });
+      }
+      setOtpVerifying(false);
+      setOtpDialogOpen(false);
+    }, 800);
+  };
+
+  const handleResendOtp = () => {
+    if (otpCountdown > 0) return;
+    setOtpCountdown(30);
+    setOtpValue("");
+    setOtpError("");
+    const target = otpType === "phone" ? data.phone : data.email;
+    toast({
+      title: "OTP Resent! 🔄",
+      description: `New verification code sent to ${target}. Demo OTP: 123456`,
+    });
+  };
+
   const handleVerifyPhone = () => {
     if (!data.phone || data.phone.length !== 10) {
       toast({
@@ -305,21 +385,7 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
       });
       return;
     }
-
-    // Mock sending OTP
-    toast({
-      title: "OTP Sent! 📱",
-      description: `Verification code sent to ${data.phone}. Demo OTP: 123456`,
-    });
-
-    // For demo, automatically mark as verified after 2 seconds
-    setTimeout(() => {
-      handleInputChange('phoneVerified', true);
-      toast({
-        title: "Phone Verified! ✅",
-        description: "Your phone number has been verified successfully.",
-      });
-    }, 2000);
+    openOtpDialog("phone");
   };
 
   const handleVerifyEmail = () => {
@@ -331,21 +397,7 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
       });
       return;
     }
-
-    // Mock sending OTP
-    toast({
-      title: "OTP Sent! 📧",
-      description: `Verification code sent to ${data.email}. Demo OTP: 123456`,
-    });
-
-    // For demo, automatically mark as verified after 2 seconds
-    setTimeout(() => {
-      handleInputChange('emailVerified', true);
-      toast({
-        title: "Email Verified! ✅",
-        description: "Your email has been verified successfully.",
-      });
-    }, 2000);
+    openOtpDialog("email");
   };
 
   const isPasswordValid = Boolean(
@@ -353,7 +405,15 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
     data.password.length >= 8 &&
     data.password === data.confirmPassword
   );
-  const isValid = Boolean(data.name && data.age && data.gender && data.phone && data.phone.length === 10 && data.phoneVerified && isPasswordValid);
+  // Check all job experiences have required fields filled
+  const areJobExperiencesValid = data.jobExperiences.length === 0 || data.jobExperiences.every(exp =>
+    exp.company && exp.position && exp.fromYear && (exp.currentlyWorking || exp.tillYear)
+  );
+  // Check all education experiences have required fields filled
+  const areEducationExperiencesValid = data.educationExperiences.length === 0 || data.educationExperiences.every(edu =>
+    edu.institution && edu.degree && edu.startYear && edu.endYear
+  );
+  const isValid = Boolean(data.name && data.age && data.gender && data.phone && data.phone.length === 10 && data.phoneVerified && isPasswordValid && areJobExperiencesValid && areEducationExperiencesValid);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -389,7 +449,10 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
       {/* Form Fields */}
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="name">Full Name <span className="text-red-500">*</span></Label>
+          <Label htmlFor="name" className="flex items-center gap-2">
+            <User className="w-4 h-4" />
+            Full Name <span className="text-red-500">*</span>
+          </Label>
           <Input
             id="name"
             placeholder="Enter your full name"
@@ -400,17 +463,24 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="age">Age <span className="text-red-500">*</span></Label>
+            <Label htmlFor="age" className="flex items-center gap-2">
+              <Calendar className="w-4 h-4" />
+              Age <span className="text-red-500">*</span>
+            </Label>
             <Input
               id="age"
               type="number"
-              placeholder="25"
+              min="1"
+              placeholder="Ex: 25"
               value={data.age}
               onChange={(e) => handleInputChange('age', e.target.value)}
             />
           </div>
           <div className="space-y-2">
-            <Label>Gender <span className="text-red-500">*</span></Label>
+            <Label className="flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              Gender <span className="text-red-500">*</span>
+            </Label>
             <RadioGroup
               value={data.gender}
               onValueChange={(value) => handleInputChange('gender', value)}
@@ -433,7 +503,10 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="phone">Phone Number <span className="text-red-500">*</span></Label>
+          <Label htmlFor="phone" className="flex items-center gap-2">
+            <Phone className="w-4 h-4" />
+            Phone Number <span className="text-red-500">*</span>
+          </Label>
           <div className="flex gap-2">
             <Input
               id="phone"
@@ -645,7 +718,7 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <BrandMultiSelect
-                        label="Company"
+                        label={<>Company <span className="text-red-500">*</span></>}
                         icon={<Briefcase className="w-4 h-4" />}
                         placeholder="Search companies..."
                         options={companiesDb}
@@ -663,7 +736,10 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor={`position-${experience.id}`} className="flex items-center h-5">Position</Label>
+                      <Label htmlFor={`position-${experience.id}`} className="flex items-center gap-2 h-5">
+                        <UserCheck className="w-4 h-4" />
+                        Position <span className="text-red-500">*</span>
+                      </Label>
                       <SearchableSelect
                         value={positionOptions.includes(experience.position) && experience.position !== "Other" ? experience.position : ""}
                         onValueChange={(val) => {
@@ -685,7 +761,10 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <Label htmlFor={`from-year-${experience.id}`}>From Year</Label>
+                      <Label htmlFor={`from-year-${experience.id}`} className="flex items-center gap-2">
+                        <CalendarArrowUp className="w-4 h-4" />
+                        From Year <span className="text-red-500">*</span>
+                      </Label>
                       <Select
                         value={experience.fromYear}
                         onValueChange={(value) => updateJobExperience(experience.id, 'fromYear', value)}
@@ -707,7 +786,10 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor={`till-year-${experience.id}`}>Till Year</Label>
+                      <Label htmlFor={`till-year-${experience.id}`} className="flex items-center gap-2">
+                        <CalendarArrowDown className="w-4 h-4" />
+                        Till Year {!experience.currentlyWorking && <span className="text-red-500">*</span>}
+                      </Label>
                       {experience.currentlyWorking ? (
                         <div className="h-10 px-3 py-2 bg-muted border border-border rounded-md flex items-center text-muted-foreground">
                           Currently Working
@@ -797,7 +879,7 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <BrandMultiSelect
-                        label="School / College / University"
+                        label={<>Institution <span className="text-red-500">*</span></>}
                         icon={<BookOpen className="w-4 h-4" />}
                         placeholder="Search schools..."
                         options={schoolsDb}
@@ -815,7 +897,10 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor={`degree-${education.id}`} className="flex items-center h-5">Degree</Label>
+                      <Label htmlFor={`degree-${education.id}`} className="flex items-center gap-2 h-5">
+                        <GraduationCap className="w-4 h-4" />
+                        Degree <span className="text-red-500">*</span>
+                      </Label>
                       <SearchableSelect
                         value={degreeOptions.includes(education.degree) && education.degree !== "Other" ? education.degree : ""}
                         onValueChange={(val) => {
@@ -837,7 +922,10 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <Label htmlFor={`start-year-${education.id}`}>Start Year</Label>
+                      <Label htmlFor={`start-year-${education.id}`} className="flex items-center gap-2">
+                        <CalendarArrowUp className="w-4 h-4" />
+                        Start Year <span className="text-red-500">*</span>
+                      </Label>
                       <Select
                         value={education.startYear}
                         onValueChange={(value) => updateEducationExperience(education.id, 'startYear', value)}
@@ -859,7 +947,10 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor={`end-year-${education.id}`}>End Year</Label>
+                      <Label htmlFor={`end-year-${education.id}`} className="flex items-center gap-2">
+                        <CalendarArrowDown className="w-4 h-4" />
+                        End Year <span className="text-red-500">*</span>
+                      </Label>
                       <Select
                         value={education.endYear}
                         onValueChange={(value) => updateEducationExperience(education.id, 'endYear', value)}
@@ -1015,6 +1106,93 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
             >
               Add to DB
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* OTP Verification Dialog */}
+      <Dialog open={otpDialogOpen} onOpenChange={(open) => {
+        if (!otpVerifying) setOtpDialogOpen(open);
+      }}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md mx-auto p-4 sm:p-6">
+          <DialogHeader className="text-center space-y-2 sm:space-y-3">
+            <div className="flex justify-center">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-primary rounded-full flex items-center justify-center">
+                <ShieldCheck className="w-6 h-6 sm:w-8 sm:h-8 text-primary-foreground" />
+              </div>
+            </div>
+            <DialogTitle className="text-lg sm:text-xl font-bold text-center">
+              Verify {otpType === "phone" ? "Phone Number" : "Email Address"}
+            </DialogTitle>
+            <DialogDescription className="text-sm sm:text-base text-muted-foreground text-center">
+              Enter the 6-digit code sent to{" "}
+              <span className="font-semibold text-foreground break-all">
+                {otpType === "phone" ? data.phone : data.email}
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col items-center gap-4 sm:gap-6 py-3 sm:py-4">
+            {/* OTP Input */}
+            <InputOTP
+              maxLength={6}
+              value={otpValue}
+              onChange={(value) => {
+                setOtpValue(value);
+                setOtpError("");
+              }}
+            >
+              <InputOTPGroup className="gap-1.5 sm:gap-2">
+                <InputOTPSlot index={0} className="w-10 h-10 sm:w-12 sm:h-12 text-base sm:text-lg font-semibold rounded-md" />
+                <InputOTPSlot index={1} className="w-10 h-10 sm:w-12 sm:h-12 text-base sm:text-lg font-semibold rounded-md" />
+                <InputOTPSlot index={2} className="w-10 h-10 sm:w-12 sm:h-12 text-base sm:text-lg font-semibold rounded-md" />
+                <InputOTPSlot index={3} className="w-10 h-10 sm:w-12 sm:h-12 text-base sm:text-lg font-semibold rounded-md" />
+                <InputOTPSlot index={4} className="w-10 h-10 sm:w-12 sm:h-12 text-base sm:text-lg font-semibold rounded-md" />
+                <InputOTPSlot index={5} className="w-10 h-10 sm:w-12 sm:h-12 text-base sm:text-lg font-semibold rounded-md" />
+              </InputOTPGroup>
+            </InputOTP>
+
+            {/* Error Message */}
+            {otpError && (
+              <p className="text-xs sm:text-sm text-red-500 text-center px-2">{otpError}</p>
+            )}
+
+            {/* Verify Button */}
+            <Button
+              onClick={handleOtpVerify}
+              disabled={otpValue.length !== 6 || otpVerifying}
+              className="w-full h-10 sm:h-11 text-sm sm:text-base"
+              variant="gradient"
+            >
+              {otpVerifying ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Verifying...
+                </span>
+              ) : (
+                "Verify OTP"
+              )}
+            </Button>
+
+            {/* Resend Section */}
+            <div className="text-center text-xs sm:text-sm text-muted-foreground">
+              {otpCountdown > 0 ? (
+                <p>
+                  Resend code in{" "}
+                  <span className="font-semibold text-foreground">
+                    {otpCountdown}s
+                  </span>
+                </p>
+              ) : (
+                <button
+                  onClick={handleResendOtp}
+                  className="text-primary font-semibold hover:underline transition-colors"
+                  type="button"
+                >
+                  Resend OTP
+                </button>
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
