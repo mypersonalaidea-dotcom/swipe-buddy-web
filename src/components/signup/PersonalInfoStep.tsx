@@ -613,7 +613,7 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor={`position-${experience.id}`}>Position</Label>
+                      <Label htmlFor={`position-${experience.id}`} className="flex items-center h-5">Position</Label>
                       <SearchableSelect
                         value={positionOptions.includes(experience.position) && experience.position !== "Other" ? experience.position : ""}
                         onValueChange={(val) => {
@@ -765,7 +765,7 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor={`degree-${education.id}`}>Degree</Label>
+                      <Label htmlFor={`degree-${education.id}`} className="flex items-center h-5">Degree</Label>
                       <SearchableSelect
                         value={degreeOptions.includes(education.degree) && education.degree !== "Other" ? education.degree : ""}
                         onValueChange={(val) => {
