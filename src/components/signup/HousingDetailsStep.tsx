@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MediaUpload } from "@/components/ui/media-upload";
-import { Home, Camera, Plus, Trash2, DoorOpen, Building2 } from "lucide-react";
+import { Home, Camera, Plus, Trash2, DoorOpen, Building2, Calendar } from "lucide-react";
 
 interface MediaFile {
   id: string;
@@ -160,7 +160,12 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
     updateRoom(roomId, 'amenities', updatedAmenities);
   };
 
-  const isValid = !!data.searchType;
+  let isValid = !!data.searchType;
+
+  // Custom Validation
+  if (data.searchType === "flat" || data.searchType === "both") {
+    isValid = isValid && !!data.propertyMoveInDate;
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -218,7 +223,10 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="property-move-in">Property Move-in Date</Label>
+              <Label htmlFor="property-move-in" className="flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                Property Move-in Date <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="property-move-in"
                 type="date"

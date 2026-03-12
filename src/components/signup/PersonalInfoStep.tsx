@@ -326,7 +326,7 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
     setOtpDialogOpen(true);
     setOtpCountdown(30);
 
-    const target = type === "phone" ? data.phone : data.email;
+    const target = type === "phone" ? `${countryCode} ${data.phone}` : data.email;
     toast({
       title: type === "phone" ? "OTP Sent! 📱" : "OTP Sent! 📧",
       description: `Verification code sent to ${target}. Demo OTP: 123456`,
@@ -370,7 +370,7 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
     setOtpCountdown(30);
     setOtpValue("");
     setOtpError("");
-    const target = otpType === "phone" ? data.phone : data.email;
+    const target = otpType === "phone" ? `${countryCode} ${data.phone}` : data.email;
     toast({
       title: "OTP Resent! 🔄",
       description: `New verification code sent to ${target}. Demo OTP: 123456`,
@@ -1164,7 +1164,7 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
             <DialogDescription className="text-sm sm:text-base text-muted-foreground text-center">
               Enter the 6-digit code sent to{" "}
               <span className="font-semibold text-foreground break-all">
-                {otpType === "phone" ? data.phone : data.email}
+                {otpType === "phone" ? `${countryCode} ${data.phone}` : data.email}
               </span>
             </DialogDescription>
           </DialogHeader>
