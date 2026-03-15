@@ -167,6 +167,21 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
     isValid = isValid && !!data.propertyMoveInDate;
   }
 
+  if (data.searchType === "flatmate" || data.searchType === "both") {
+    if (!data.flatDetails) {
+      isValid = false;
+    } else {
+      isValid = isValid &&
+        !!data.flatDetails.address &&
+        !!data.flatDetails.city &&
+        !!data.flatDetails.state &&
+        !!data.flatDetails.flatType &&
+        !!data.flatDetails.flatFurnishing &&
+        Array.isArray(data.flatDetails.commonMedia) &&
+        data.flatDetails.commonMedia.length > 0;
+    }
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="text-center space-y-2">
@@ -249,7 +264,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="flat-address">Flat Address</Label>
+              <Label htmlFor="flat-address">Flat Address <span className="text-destructive">*</span></Label>
               <Input
                 id="flat-address"
                 placeholder="123 Main St, Sector 69"
@@ -283,7 +298,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <Building2 className="w-4 h-4" />
-                  Flat Type
+                  Flat Type <span className="text-destructive">*</span>
                 </Label>
                 <Select value={data.flatDetails.flatType || ''} onValueChange={(value) => handleFlatDetailsChange('flatType', value)}>
                   <SelectTrigger>
@@ -302,7 +317,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <Building2 className="w-4 h-4" />
-                  Furnishing
+                  Furnishing <span className="text-destructive">*</span>
                 </Label>
                 <Select value={data.flatDetails.flatFurnishing || ''} onValueChange={(value) => handleFlatDetailsChange('flatFurnishing', value)}>
                   <SelectTrigger>
@@ -577,7 +592,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
             <div className="space-y-3">
               <Label className="flex items-center gap-2">
                 <Camera className="w-4 h-4" />
-                Common Area Photos & Videos
+                Common Area Photos & Videos <span className="text-destructive">*</span>
               </Label>
               <p className="text-sm text-muted-foreground">
                 Add photos and videos of common areas (living room, kitchen, etc.)
