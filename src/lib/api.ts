@@ -1,6 +1,7 @@
 import axios from "axios";
 
-// Use relative URL so requests go through Vite's dev proxy (bypasses CORS)
+// Use relative URL — in dev, Vite's proxy (vite.config.ts) forwards to Render.
+// In production, vercel.json rewrites /api/v1/* to the Render backend.
 const BASE_URL = "/api/v1";
 
 export const api = axios.create({
