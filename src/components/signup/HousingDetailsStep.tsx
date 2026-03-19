@@ -427,6 +427,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                           value={room.quantity}
                           onChange={(e) => updateRoom(room.id, 'quantity', e.target.value)}
                         />
+                        {Number(room.quantity) > 99 && <p className="text-xs text-destructive">Max allowed: 99</p>}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor={`rent-${room.id}`}>Rent (₹/month) <span className="text-destructive">*</span></Label>
@@ -438,6 +439,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                           value={room.rent}
                           onChange={(e) => updateRoom(room.id, 'rent', e.target.value)}
                         />
+                        {Number(room.rent) > 9999999 && <p className="text-xs text-destructive">Max allowed: 99,99,999</p>}
                       </div>
                     </div>
 
@@ -490,6 +492,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                             </SelectContent>
                           </Select>
                         </div>
+                        {Number((room.securityDeposit.replace('none|', ''))?.split(' ')[0]) > 99 && <p className="text-xs text-destructive">Max allowed: 99</p>}
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
@@ -539,6 +542,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                             </SelectContent>
                           </Select>
                         </div>
+                        {Number((room.brokerage.replace('none|', ''))?.split(' ')[0]) > 99 && <p className="text-xs text-destructive">Max allowed: 99</p>}
                       </div>
                     </div>
 
