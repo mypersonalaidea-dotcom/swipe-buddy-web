@@ -771,6 +771,7 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
                     <div className="space-y-2">
                       <BrandMultiSelect
                         label={<>Company <span className="text-red-500">*</span></>}
+                        dialogLabel="Company"
                         icon={<Briefcase className="w-4 h-4" />}
                         placeholder="Search companies..."
                         options={companiesDb}
@@ -1045,7 +1046,9 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
                 placeholder="e.g. Bachelor of Technology"
                 value={newDegreeFullName}
                 onChange={(e) => setNewDegreeFullName(e.target.value)}
+                maxLength={50}
               />
+              <p className="text-xs text-muted-foreground text-right">{newDegreeFullName.length}/50</p>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="degreeCommonName">Most commonly known as <span className="text-red-500">*</span></Label>
@@ -1054,7 +1057,9 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
                 placeholder="e.g. B.Tech"
                 value={newDegreeCommonName}
                 onChange={(e) => setNewDegreeCommonName(e.target.value)}
+                maxLength={50}
               />
+              <p className="text-xs text-muted-foreground text-right">{newDegreeCommonName.length}/50</p>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="degreeOtherNames">Other common names</Label>
@@ -1063,7 +1068,9 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
                 placeholder="e.g. BTech, B.E."
                 value={newDegreeOtherNames}
                 onChange={(e) => setNewDegreeOtherNames(e.target.value)}
+                maxLength={250}
               />
+              <p className="text-xs text-muted-foreground text-right">{newDegreeOtherNames.length}/250</p>
             </div>
             <Button
               className="mt-2 w-full"
@@ -1112,7 +1119,9 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
                 placeholder="e.g. Software Development Engineer"
                 value={newPositionFullName}
                 onChange={(e) => setNewPositionFullName(e.target.value)}
+                maxLength={50}
               />
+              <p className="text-xs text-muted-foreground text-right">{newPositionFullName.length}/50</p>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="positionCommonName">Most commonly known as <span className="text-red-500">*</span></Label>
@@ -1121,7 +1130,9 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
                 placeholder="e.g. SDE"
                 value={newPositionCommonName}
                 onChange={(e) => setNewPositionCommonName(e.target.value)}
+                maxLength={50}
               />
+              <p className="text-xs text-muted-foreground text-right">{newPositionCommonName.length}/50</p>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="positionOtherNames">Other common names</Label>
@@ -1130,7 +1141,9 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
                 placeholder="e.g. Developer, Dev"
                 value={newPositionOtherNames}
                 onChange={(e) => setNewPositionOtherNames(e.target.value)}
+                maxLength={250}
               />
+              <p className="text-xs text-muted-foreground text-right">{newPositionOtherNames.length}/250</p>
             </div>
             <Button
               className="mt-2 w-full"
