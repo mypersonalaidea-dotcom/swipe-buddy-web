@@ -25,6 +25,7 @@ interface RoomDetails {
   securityDeposit: string;
   brokerage: string;
   availableFrom: string;
+  description: string;
   amenities: string[];
   media: MediaFile[];
 }
@@ -108,6 +109,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
       securityDeposit: "2 Month",
       brokerage: "15 Day",
       availableFrom: new Date().toISOString().split('T')[0],
+      description: "",
       amenities: [],
       media: []
     };
@@ -420,6 +422,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                           id={`quantity-${room.id}`}
                           type="number"
                           min={1}
+                          max={99}
                           placeholder="1"
                           value={room.quantity}
                           onChange={(e) => updateRoom(room.id, 'quantity', e.target.value)}
@@ -430,6 +433,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                         <Input
                           id={`rent-${room.id}`}
                           type="number"
+                          max={9999999}
                           placeholder="Ex: 15000"
                           value={room.rent}
                           onChange={(e) => updateRoom(room.id, 'rent', e.target.value)}
@@ -459,6 +463,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                           <Input
                             type="number"
                             min={1}
+                            max={99}
                             placeholder="Ex: 2"
                             value={(room.securityDeposit.replace('none|', ''))?.split(' ')[0] || ''}
                             onChange={(e) => {
@@ -507,6 +512,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                           <Input
                             type="number"
                             min={1}
+                            max={99}
                             placeholder="Ex: 1"
                             value={(room.brokerage.replace('none|', ''))?.split(' ')[0] || ''}
                             onChange={(e) => {
@@ -545,6 +551,19 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                         value={room.availableFrom}
                         onChange={(e) => updateRoom(room.id, 'availableFrom', e.target.value)}
                       />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`description-${room.id}`}>Room Description</Label>
+                      <Textarea
+                        id={`description-${room.id}`}
+                        placeholder="Describe the room — size, view, natural light, attached bathroom, etc."
+                        value={room.description || ""}
+                        onChange={(e) => updateRoom(room.id, 'description', e.target.value)}
+                        maxLength={800}
+                        rows={3}
+                      />
+                      <p className="text-xs text-muted-foreground text-right">{(room.description || "").length}/800</p>
                     </div>
 
                     <div className="space-y-3">

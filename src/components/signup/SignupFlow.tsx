@@ -23,6 +23,7 @@ interface RoomDetails {
   securityDeposit: string;
   brokerage: string;
   availableFrom: string;
+  description: string;
   amenities: string[];
   media: MediaFile[];
 }
