@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Upload, User, Users, Phone, Mail, Calendar, CalendarArrowUp, CalendarArrowDown, UserCheck, GraduationCap, Plus, Trash2, Briefcase, BookOpen, Lock, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import api from "@/lib/api";
 import { BrandMultiSelect, BrandOption } from "@/components/ui/brand-multi-select";
 import {
   Dialog,
@@ -377,7 +378,7 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
     });
   };
 
-  const handleVerifyPhone = () => {
+  const handleVerifyPhone = async () => {
     if (!data.phone || data.phone.length !== 10) {
       toast({
         title: "Error",
@@ -386,6 +387,22 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
       });
       return;
     }
+
+    try {
+      const res = await api.post("/auth/check-phone", { phone: data.phone });
+      if (res.data?.data?.exists) {
+        toast({
+          title: "Phone Already Registered",
+          description: "This phone number is already associated with an existing account. Please use a different number or sign in.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } catch (error: any) {
+      // If the API call fails, still allow verification to proceed
+      console.warn("Phone check failed, proceeding with verification:", error);
+    }
+
     openOtpDialog("phone");
   };
 
