@@ -78,9 +78,10 @@ interface SignupData {
 
 interface SignupFlowProps {
   onComplete?: () => void;
+  onSwitchToLogin?: () => void;
 }
 
-export const SignupFlow = ({ onComplete }: SignupFlowProps = {}) => {
+export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isComplete, setIsComplete] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -296,6 +297,7 @@ export const SignupFlow = ({ onComplete }: SignupFlowProps = {}) => {
                 data={signupData.personalInfo}
                 onUpdate={handlePersonalInfoUpdate}
                 onNext={handleNext}
+                onSwitchToLogin={onSwitchToLogin}
               />
             )}
             {currentStep === 2 && (

@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Upload, User, Users, Phone, Mail, Calendar, CalendarArrowUp, CalendarArrowDown, UserCheck, GraduationCap, Plus, Trash2, Briefcase, BookOpen, Lock, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { Upload, User, Users, Phone, PhoneOff, Mail, Calendar, CalendarArrowUp, CalendarArrowDown, UserCheck, GraduationCap, Plus, Trash2, Briefcase, BookOpen, Lock, Eye, EyeOff, ShieldCheck, KeyRound } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
 import { BrandMultiSelect, BrandOption } from "@/components/ui/brand-multi-select";
@@ -62,13 +62,15 @@ interface PersonalInfoStepProps {
   onUpdate: (data: PersonalInfoData) => void;
   onNext: () => void;
   onOTPVerification?: (phone: string) => void;
+  onSwitchToLogin?: () => void;
 }
 
-export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepProps) => {
+export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: PersonalInfoStepProps) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [countryCode, setCountryCode] = useState("+91");
+  const [phoneExistsDialogOpen, setPhoneExistsDialogOpen] = useState(false);
 
   // Custom Degree Dialog State
   const [showAddDegreeDialog, setShowAddDegreeDialog] = useState(false);
@@ -391,11 +393,7 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
     try {
       const res = await api.post("/auth/check-phone", { phone: data.phone });
       if (res.data?.data?.exists) {
-        toast({
-          title: "Phone Already Registered",
-          description: "This phone number is already associated with an existing account. Please use a different number or sign in.",
-          variant: "destructive",
-        });
+        setPhoneExistsDialogOpen(true);
         return;
       }
     } catch (error: any) {
@@ -1159,6 +1157,50 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
               }}
             >
               Add to DB
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Phone Already Registered Dialog */}
+      <Dialog open={phoneExistsDialogOpen} onOpenChange={setPhoneExistsDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md mx-auto p-4 sm:p-6">
+          <DialogHeader className="text-center space-y-2 sm:space-y-3">
+            <div className="flex justify-center">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center shadow-lg">
+                <PhoneOff className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
+              </div>
+            </div>
+            <DialogTitle className="text-lg sm:text-xl font-bold text-center">
+              Number Already Registered
+            </DialogTitle>
+            <DialogDescription className="text-sm sm:text-base text-muted-foreground text-center">
+              🔐 An account with <span className="font-semibold text-foreground">{countryCode} {data.phone}</span> already exists.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-3 mt-4">
+            <Button
+              variant="gradient"
+              className="w-full h-11"
+              onClick={() => {
+                setPhoneExistsDialogOpen(false);
+                onSwitchToLogin?.();
+              }}
+            >
+              Sign In Instead
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full h-11 flex items-center justify-center gap-2"
+              onClick={() => {
+                setPhoneExistsDialogOpen(false);
+                // TODO: Navigate to forgot password when implemented
+                onSwitchToLogin?.();
+              }}
+            >
+              <KeyRound className="w-4 h-4" />
+              Forgot Password
             </Button>
           </div>
         </DialogContent>
