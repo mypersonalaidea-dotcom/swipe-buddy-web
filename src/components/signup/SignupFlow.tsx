@@ -65,6 +65,8 @@ interface SignupData {
     propertyMoveInDate?: string;
     flatDetails: {
       address: string;
+      /** [longitude, latitude] — set by AddressAutocomplete */
+      coordinates?: [number, number];
       city: string;
       state: string;
       flatType: string;
@@ -198,7 +200,7 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
         );
       }
 
-      // 5. Create flat listing if user has flat details
+        // 5. Create flat listing if user has flat details
       const { flatDetails, searchType } = housingDetails;
       if ((searchType === "flatmate" || searchType === "both") && flatDetails.address) {
         const furnishingMap: Record<string, string> = {
@@ -206,6 +208,11 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
           "semi-furnished": "semifurnished",
           "non-furnished": "unfurnished",
         };
+
+        // Extract lat/lng from coordinates [lng, lat]
+        const latitude  = flatDetails.coordinates?.[1];
+        const longitude = flatDetails.coordinates?.[0];
+
         await api.post("/flats", {
           address: flatDetails.address,
           city: flatDetails.city,
@@ -213,6 +220,9 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
           furnishing_type: furnishingMap[flatDetails.flatFurnishing] || "unfurnished",
           description: flatDetails.description || undefined,
           is_published: true,
+          // Coordinates — only sent when the user picked an address via autocomplete
+          ...(latitude  !== undefined && { latitude }),
+          ...(longitude !== undefined && { longitude }),
         });
       }
 

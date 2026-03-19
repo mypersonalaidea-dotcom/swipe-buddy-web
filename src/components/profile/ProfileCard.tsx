@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { MapPin, Briefcase, GraduationCap, Home, Send, Bookmark, MoreVertical, Flag, ShieldOff } from "lucide-react";
+import { MapPin, Briefcase, GraduationCap, Home, Send, Bookmark, MoreVertical, Flag, ShieldOff, ExternalLink } from "lucide-react";
+import { MAPBOX_TOKEN } from "@/lib/maps/config";
 import { getHabitIcon } from "@/constants/habits";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -58,6 +59,8 @@ export interface Profile {
   educationExperiences: EducationExperience[];
   flatDetails?: {
     address: string;
+    /** [longitude, latitude] — populated from AddressAutocomplete */
+    coordinates?: [number, number];
     furnishingType: string;
     commonAmenities: string[];
     commonPhotos: string[];
@@ -206,9 +209,36 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                     </div>
                   </div>
 
-                  {/* Location Map */}
-                  <div className="bg-muted h-32 flex items-center justify-center border-t md:border-t-0 md:border-l border-border md:col-span-2">
-                    <p className="text-muted-foreground text-sm">Map View</p>
+                  {/* Location Map — Mapbox Static Image */}
+                  <div className="relative h-32 bg-muted border-t md:border-t-0 md:border-l border-border md:col-span-2 overflow-hidden">
+                    {profile.flatDetails.coordinates && MAPBOX_TOKEN && MAPBOX_TOKEN.startsWith('pk.') ? (
+                      <>
+                        <img
+                          src={
+                            `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/` +
+                            `pin-s+6366f1(${profile.flatDetails.coordinates[0]},${profile.flatDetails.coordinates[1]})/` +
+                            `${profile.flatDetails.coordinates[0]},${profile.flatDetails.coordinates[1]},14/` +
+                            `400x128@2x?access_token=${MAPBOX_TOKEN}`
+                          }
+                          alt="Flat location map"
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                        <a
+                          href={`https://www.google.com/maps?q=${profile.flatDetails.coordinates[1]},${profile.flatDetails.coordinates[0]}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="absolute bottom-1.5 right-1.5 flex items-center gap-1 text-[10px] bg-background/90 backdrop-blur-sm px-1.5 py-0.5 rounded-full border border-border text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          Open in Maps <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      </>
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center gap-1.5">
+                        <MapPin className="w-5 h-5 text-muted-foreground/40" />
+                        <p className="text-muted-foreground text-xs">No location found</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

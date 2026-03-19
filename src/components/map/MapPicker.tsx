@@ -135,17 +135,18 @@ export function MapPicker({
       </div>
 
       {/* ── Map ──────────────────────────────────────────────── */}
-      <div className="relative rounded-lg overflow-hidden border border-border shadow-sm">
+      <div className="relative">
         <MapRenderer
           center={center}
           zoom={zoom}
           radius={showRadius ? radius : undefined}
           onMarkerDragEnd={handleLocationSelected}
           height={height}
+          className="w-full rounded-lg overflow-hidden border border-border shadow-sm"
         />
 
-        {/* Provider badge */}
-        <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-background/80 backdrop-blur-sm border border-border text-[10px] text-muted-foreground">
+        {/* Provider badge — only show when map renders (no error) */}
+        <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-background/80 backdrop-blur-sm border border-border text-[10px] text-muted-foreground pointer-events-none">
           {activeProvider === 'mapbox' ? '🗺 Mapbox' : '🗺 Google Maps'}
         </div>
       </div>
