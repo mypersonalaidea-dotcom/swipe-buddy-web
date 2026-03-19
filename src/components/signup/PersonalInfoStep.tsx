@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Upload, User, Users, Phone, Mail, Calendar, CalendarArrowUp, CalendarArrowDown, UserCheck, GraduationCap, Plus, Trash2, Briefcase, BookOpen, Lock, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { Upload, User, Users, Phone, PhoneOff, Mail, Calendar, CalendarArrowUp, CalendarArrowDown, UserCheck, GraduationCap, Plus, Trash2, Briefcase, BookOpen, Lock, Eye, EyeOff, ShieldCheck, KeyRound } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import api from "@/lib/api";
 import { BrandMultiSelect, BrandOption } from "@/components/ui/brand-multi-select";
 import {
   Dialog,
@@ -61,13 +62,15 @@ interface PersonalInfoStepProps {
   onUpdate: (data: PersonalInfoData) => void;
   onNext: () => void;
   onOTPVerification?: (phone: string) => void;
+  onSwitchToLogin?: () => void;
 }
 
-export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepProps) => {
+export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: PersonalInfoStepProps) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [countryCode, setCountryCode] = useState("+91");
+  const [phoneExistsDialogOpen, setPhoneExistsDialogOpen] = useState(false);
 
   // Custom Degree Dialog State
   const [showAddDegreeDialog, setShowAddDegreeDialog] = useState(false);
@@ -377,7 +380,7 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
     });
   };
 
-  const handleVerifyPhone = () => {
+  const handleVerifyPhone = async () => {
     if (!data.phone || data.phone.length !== 10) {
       toast({
         title: "Error",
@@ -386,6 +389,18 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
       });
       return;
     }
+
+    try {
+      const res = await api.post("/auth/check-phone", { phone: data.phone });
+      if (res.data?.data?.exists) {
+        setPhoneExistsDialogOpen(true);
+        return;
+      }
+    } catch (error: any) {
+      // If the API call fails, still allow verification to proceed
+      console.warn("Phone check failed, proceeding with verification:", error);
+    }
+
     openOtpDialog("phone");
   };
 
@@ -756,6 +771,7 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
                     <div className="space-y-2">
                       <BrandMultiSelect
                         label={<>Company <span className="text-red-500">*</span></>}
+                        dialogLabel="Company"
                         icon={<Briefcase className="w-4 h-4" />}
                         placeholder="Search companies..."
                         options={companiesDb}
@@ -1030,7 +1046,9 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
                 placeholder="e.g. Bachelor of Technology"
                 value={newDegreeFullName}
                 onChange={(e) => setNewDegreeFullName(e.target.value)}
+                maxLength={50}
               />
+              <p className="text-xs text-muted-foreground text-right">{newDegreeFullName.length}/50</p>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="degreeCommonName">Most commonly known as <span className="text-red-500">*</span></Label>
@@ -1039,7 +1057,9 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
                 placeholder="e.g. B.Tech"
                 value={newDegreeCommonName}
                 onChange={(e) => setNewDegreeCommonName(e.target.value)}
+                maxLength={50}
               />
+              <p className="text-xs text-muted-foreground text-right">{newDegreeCommonName.length}/50</p>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="degreeOtherNames">Other common names</Label>
@@ -1048,7 +1068,9 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
                 placeholder="e.g. BTech, B.E."
                 value={newDegreeOtherNames}
                 onChange={(e) => setNewDegreeOtherNames(e.target.value)}
+                maxLength={250}
               />
+              <p className="text-xs text-muted-foreground text-right">{newDegreeOtherNames.length}/250</p>
             </div>
             <Button
               className="mt-2 w-full"
@@ -1097,7 +1119,9 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
                 placeholder="e.g. Software Development Engineer"
                 value={newPositionFullName}
                 onChange={(e) => setNewPositionFullName(e.target.value)}
+                maxLength={50}
               />
+              <p className="text-xs text-muted-foreground text-right">{newPositionFullName.length}/50</p>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="positionCommonName">Most commonly known as <span className="text-red-500">*</span></Label>
@@ -1106,7 +1130,9 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
                 placeholder="e.g. SDE"
                 value={newPositionCommonName}
                 onChange={(e) => setNewPositionCommonName(e.target.value)}
+                maxLength={50}
               />
+              <p className="text-xs text-muted-foreground text-right">{newPositionCommonName.length}/50</p>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="positionOtherNames">Other common names</Label>
@@ -1115,7 +1141,9 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
                 placeholder="e.g. Developer, Dev"
                 value={newPositionOtherNames}
                 onChange={(e) => setNewPositionOtherNames(e.target.value)}
+                maxLength={250}
               />
+              <p className="text-xs text-muted-foreground text-right">{newPositionOtherNames.length}/250</p>
             </div>
             <Button
               className="mt-2 w-full"
@@ -1142,6 +1170,50 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext }: PersonalInfoStepPro
               }}
             >
               Add to DB
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Phone Already Registered Dialog */}
+      <Dialog open={phoneExistsDialogOpen} onOpenChange={setPhoneExistsDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md mx-auto p-4 sm:p-6">
+          <DialogHeader className="text-center space-y-2 sm:space-y-3">
+            <div className="flex justify-center">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center shadow-lg">
+                <PhoneOff className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
+              </div>
+            </div>
+            <DialogTitle className="text-lg sm:text-xl font-bold text-center">
+              Number Already Registered
+            </DialogTitle>
+            <DialogDescription className="text-sm sm:text-base text-muted-foreground text-center">
+              🔐 An account with <span className="font-semibold text-foreground">{countryCode} {data.phone}</span> already exists.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-3 mt-4">
+            <Button
+              variant="gradient"
+              className="w-full h-11"
+              onClick={() => {
+                setPhoneExistsDialogOpen(false);
+                onSwitchToLogin?.();
+              }}
+            >
+              Sign In Instead
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full h-11 flex items-center justify-center gap-2"
+              onClick={() => {
+                setPhoneExistsDialogOpen(false);
+                // TODO: Navigate to forgot password when implemented
+                onSwitchToLogin?.();
+              }}
+            >
+              <KeyRound className="w-4 h-4" />
+              Forgot Password
             </Button>
           </div>
         </DialogContent>

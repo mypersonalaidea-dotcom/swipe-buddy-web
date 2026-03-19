@@ -43,12 +43,12 @@ export const AuthFlow = () => {
   switch (currentView) {
     case "login":
       return (
-        <LoginPage 
+        <LoginPage
           onLogin={handleLogin}
           onSignup={handleSignup}
         />
       );
-    
+
     case "signup":
       return (
         <div>
@@ -60,10 +60,10 @@ export const AuthFlow = () => {
               ← Back to Login
             </button>
           </div>
-          <SignupFlow onComplete={handleSignupComplete} />
+          <SignupFlow onComplete={handleSignupComplete} onSwitchToLogin={handleBackToLogin} />
         </div>
       );
-    
+
     case "otp-verification":
       return (
         <OTPVerification
@@ -72,7 +72,7 @@ export const AuthFlow = () => {
           onBack={handleBackToSignup}
         />
       );
-    
+
     default:
       return null;
   }

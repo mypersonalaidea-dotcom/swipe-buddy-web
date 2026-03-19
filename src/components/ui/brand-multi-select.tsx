@@ -31,6 +31,7 @@ export interface BrandOption {
 
 interface BrandMultiSelectProps {
     label: React.ReactNode;
+    dialogLabel?: string;
     icon?: React.ReactNode;
     placeholder?: string;
     options: BrandOption[];
@@ -42,6 +43,7 @@ interface BrandMultiSelectProps {
 
 export function BrandMultiSelect({
     label,
+    dialogLabel,
     icon,
     placeholder = "Search...",
     options,
@@ -273,7 +275,7 @@ export function BrandMultiSelect({
             <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
                 <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
-                        <DialogTitle>Add New {label} to DB</DialogTitle>
+                        <DialogTitle>Add New {dialogLabel || label} to DB</DialogTitle>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="space-y-2">
@@ -303,11 +305,15 @@ export function BrandMultiSelect({
                                     if (nameError) setNameError("");
                                 }}
                                 placeholder="Google"
+                                maxLength={50}
                             />
                             {nameError && <p className="text-xs text-destructive">{nameError}</p>}
-                            <p className="text-xs text-muted-foreground">
-                                Only space and alphabets allowed, no special characters or numbers.
-                            </p>
+                            <div className="flex justify-between">
+                                <p className="text-xs text-muted-foreground">
+                                    Only space and alphabets allowed, no special characters or numbers.
+                                </p>
+                                <p className="text-xs text-muted-foreground whitespace-nowrap ml-2">{addName.length}/50</p>
+                            </div>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="add-aliases">Other Common Names (Optional)</Label>
@@ -316,10 +322,14 @@ export function BrandMultiSelect({
                                 value={addAliases}
                                 onChange={(e) => setAddAliases(e.target.value)}
                                 placeholder="Ex: Google India, Alphabet"
+                                maxLength={250}
                             />
-                            <p className="text-xs text-muted-foreground">
-                                Separate multiple names with commas.
-                            </p>
+                            <div className="flex justify-between">
+                                <p className="text-xs text-muted-foreground">
+                                    Separate multiple names with commas.
+                                </p>
+                                <p className="text-xs text-muted-foreground whitespace-nowrap ml-2">{addAliases.length}/250</p>
+                            </div>
                         </div>
                     </div>
                     <DialogFooter>

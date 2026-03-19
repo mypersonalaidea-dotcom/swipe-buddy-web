@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,6 +26,7 @@ interface RoomDetails {
   securityDeposit: string;
   brokerage: string;
   availableFrom: string;
+  description: string;
   amenities: string[];
   media: MediaFile[];
 }
@@ -111,6 +112,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
       securityDeposit: "2 Month",
       brokerage: "15 Day",
       availableFrom: new Date().toISOString().split('T')[0],
+      description: "",
       amenities: [],
       media: []
     };
@@ -122,6 +124,16 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
       }
     });
   };
+
+  // Auto-add Room #1 when flat details section is shown with no rooms
+  useEffect(() => {
+    if (
+      (data.searchType === "flatmate" || data.searchType === "both") &&
+      (!data.flatDetails.rooms || data.flatDetails.rooms.length === 0)
+    ) {
+      addRoom();
+    }
+  }, [data.searchType]);
 
   const removeRoom = (id: string) => {
     onUpdate({
@@ -182,6 +194,24 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
         !!data.flatDetails.flatFurnishing &&
         Array.isArray(data.flatDetails.commonMedia) &&
         data.flatDetails.commonMedia.length > 0;
+
+      // Room validation: at least 1 room required, and every room must have all mandatory fields
+      const rooms = data.flatDetails.rooms || [];
+      if (rooms.length === 0) {
+        isValid = false;
+      } else {
+        const allRoomsValid = rooms.every(room =>
+          !!room.roomType &&
+          !!room.quantity &&
+          !!room.rent &&
+          !!room.securityDeposit &&
+          !!room.brokerage &&
+          !!room.availableFrom &&
+          Array.isArray(room.media) &&
+          room.media.length > 0
+        );
+        isValid = isValid && allRoomsValid;
+      }
     }
   }
 
@@ -367,18 +397,12 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                 </Button>
               </div>
 
-              {(data.flatDetails.rooms || []).length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground border rounded-lg bg-accent/30">
-                  <DoorOpen className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>No rooms added yet</p>
-                  <p className="text-sm">Click "Add Room" to get started</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {(data.flatDetails.rooms || []).map((room, index) => (
-                    <div key={room.id} className="border rounded-lg p-4 space-y-4 bg-accent/30">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-medium text-foreground">Room #{index + 1}</h4>
+              <div className="space-y-4">
+                {(data.flatDetails.rooms || []).map((room, index) => (
+                  <div key={room.id} className="border rounded-lg p-4 space-y-4 bg-accent/30">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-foreground">Room #{index + 1}</h4>
+                      {index > 0 && (
                         <Button
                           type="button"
                           onClick={() => removeRoom(room.id)}
@@ -388,190 +412,211 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
-                      </div>
+                      )}
+                    </div>
 
+                    <div className="space-y-2">
+                      <Label>Room Type <span className="text-destructive">*</span></Label>
+                      <RadioGroup
+                        value={room.roomType}
+                        onValueChange={(value) => updateRoom(room.id, 'roomType', value)}
+                        className="grid grid-cols-2 gap-2"
+                      >
+                        {Object.entries(roomTypeLabels).map(([value, label]) => (
+                          <div key={value} className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-accent/50 transition-colors">
+                            <RadioGroupItem value={value} id={`${room.id}-${value}`} />
+                            <Label htmlFor={`${room.id}-${value}`} className="text-sm cursor-pointer">{label}</Label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-2">
-                        <Label>Room Type</Label>
-                        <RadioGroup
-                          value={room.roomType}
-                          onValueChange={(value) => updateRoom(room.id, 'roomType', value)}
-                          className="grid grid-cols-2 gap-2"
-                        >
-                          {Object.entries(roomTypeLabels).map(([value, label]) => (
-                            <div key={value} className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-accent/50 transition-colors">
-                              <RadioGroupItem value={value} id={`${room.id}-${value}`} />
-                              <Label htmlFor={`${room.id}-${value}`} className="text-sm cursor-pointer">{label}</Label>
-                            </div>
-                          ))}
-                        </RadioGroup>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <Label htmlFor={`quantity-${room.id}`}>Available Quantity</Label>
-                          <Input
-                            id={`quantity-${room.id}`}
-                            type="number"
-                            min={1}
-                            placeholder="1"
-                            value={room.quantity}
-                            onChange={(e) => updateRoom(room.id, 'quantity', e.target.value)}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor={`rent-${room.id}`}>Rent (₹/month)</Label>
-                          <Input
-                            id={`rent-${room.id}`}
-                            type="number"
-                            placeholder="Ex: 15000"
-                            value={room.rent}
-                            onChange={(e) => updateRoom(room.id, 'rent', e.target.value)}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label>Security Deposit</Label>
-                            <label className="flex items-center gap-1.5 cursor-pointer">
-                              <span className="text-xs text-muted-foreground">No Deposit</span>
-                              <Checkbox
-                                checked={room.securityDeposit.startsWith('none|')}
-                                onCheckedChange={(checked) => {
-                                  if (checked) {
-                                    updateRoom(room.id, 'securityDeposit', `none|${room.securityDeposit || '2 Month'}`);
-                                  } else {
-                                    updateRoom(room.id, 'securityDeposit', room.securityDeposit.replace('none|', ''));
-                                  }
-                                }}
-                              />
-                            </label>
-                          </div>
-                          <div className={`flex gap-2 transition-opacity ${room.securityDeposit.startsWith('none|') ? 'opacity-40 pointer-events-none' : ''}`}>
-                            <Input
-                              type="number"
-                              min={1}
-                              placeholder="Ex: 2"
-                              value={(room.securityDeposit.replace('none|', ''))?.split(' ')[0] || ''}
-                              onChange={(e) => {
-                                const raw = room.securityDeposit.replace('none|', '');
-                                const unit = raw?.split(' ')[1] || 'Month';
-                                updateRoom(room.id, 'securityDeposit', e.target.value ? `${e.target.value} ${unit}` : '');
-                              }}
-                              className="flex-1"
-                            />
-                            <Select
-                              value={(room.securityDeposit.replace('none|', ''))?.split(' ')[1] || 'Month'}
-                              onValueChange={(unit) => {
-                                const raw = room.securityDeposit.replace('none|', '');
-                                const count = raw?.split(' ')[0] || '';
-                                updateRoom(room.id, 'securityDeposit', count ? `${count} ${unit}` : '');
-                              }}
-                            >
-                              <SelectTrigger className="w-[100px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Day">Day</SelectItem>
-                                <SelectItem value="Month">Month</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label>Brokerage</Label>
-                            <label className="flex items-center gap-1.5 cursor-pointer">
-                              <span className="text-xs text-muted-foreground">No Brokerage</span>
-                              <Checkbox
-                                checked={room.brokerage.startsWith('none|')}
-                                onCheckedChange={(checked) => {
-                                  if (checked) {
-                                    updateRoom(room.id, 'brokerage', `none|${room.brokerage || '15 Day'}`);
-                                  } else {
-                                    updateRoom(room.id, 'brokerage', room.brokerage.replace('none|', ''));
-                                  }
-                                }}
-                              />
-                            </label>
-                          </div>
-                          <div className={`flex gap-2 transition-opacity ${room.brokerage.startsWith('none|') ? 'opacity-40 pointer-events-none' : ''}`}>
-                            <Input
-                              type="number"
-                              min={1}
-                              placeholder="Ex: 1"
-                              value={(room.brokerage.replace('none|', ''))?.split(' ')[0] || ''}
-                              onChange={(e) => {
-                                const raw = room.brokerage.replace('none|', '');
-                                const unit = raw?.split(' ')[1] || 'Month';
-                                updateRoom(room.id, 'brokerage', e.target.value ? `${e.target.value} ${unit}` : '');
-                              }}
-                              className="flex-1"
-                            />
-                            <Select
-                              value={(room.brokerage.replace('none|', ''))?.split(' ')[1] || 'Month'}
-                              onValueChange={(unit) => {
-                                const raw = room.brokerage.replace('none|', '');
-                                const count = raw?.split(' ')[0] || '';
-                                updateRoom(room.id, 'brokerage', count ? `${count} ${unit}` : '');
-                              }}
-                            >
-                              <SelectTrigger className="w-[100px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Day">Day</SelectItem>
-                                <SelectItem value="Month">Month</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor={`available-${room.id}`}>Available From</Label>
+                        <Label htmlFor={`quantity-${room.id}`}>Available Quantity <span className="text-destructive">*</span></Label>
                         <Input
-                          id={`available-${room.id}`}
-                          type="date"
-                          className="w-fit"
-                          value={room.availableFrom}
-                          onChange={(e) => updateRoom(room.id, 'availableFrom', e.target.value)}
+                          id={`quantity-${room.id}`}
+                          type="number"
+                          min={1}
+                          max={99}
+                          placeholder="1"
+                          value={room.quantity}
+                          onChange={(e) => updateRoom(room.id, 'quantity', e.target.value)}
                         />
+                        {Number(room.quantity) > 99 && <p className="text-xs text-destructive">Max allowed: 99</p>}
                       </div>
-
-                      <div className="space-y-3">
-                        <Label>Room Amenities</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {roomAmenitiesList.map((amenity) => (
-                            <div key={amenity} className="flex items-center space-x-2">
-                              <Checkbox
-                                id={`room-${room.id}-${amenity}`}
-                                checked={room.amenities?.includes(amenity) || false}
-                                onCheckedChange={() => handleRoomAmenityToggle(room.id, amenity)}
-                              />
-                              <Label htmlFor={`room-${room.id}-${amenity}`} className="text-sm">{amenity}</Label>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="space-y-3">
-                        <Label className="flex items-center gap-2">
-                          <Camera className="w-4 h-4" />
-                          Room Photos & Videos
-                        </Label>
-                        <MediaUpload
-                          value={room.media || []}
-                          onChange={(mediaFiles) => handleRoomMediaChange(room.id, mediaFiles)}
-                          maxFiles={5}
-                          acceptedTypes={['image/*', 'video/*']}
+                      <div className="space-y-2">
+                        <Label htmlFor={`rent-${room.id}`}>Rent (₹/month) <span className="text-destructive">*</span></Label>
+                        <Input
+                          id={`rent-${room.id}`}
+                          type="number"
+                          max={9999999}
+                          placeholder="Ex: 15000"
+                          value={room.rent}
+                          onChange={(e) => updateRoom(room.id, 'rent', e.target.value)}
                         />
+                        {Number(room.rent) > 9999999 && <p className="text-xs text-destructive">Max allowed: 99,99,999</p>}
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label>Security Deposit <span className="text-destructive">*</span></Label>
+                          <label className="flex items-center gap-1.5 cursor-pointer">
+                            <span className="text-xs text-muted-foreground">No Deposit</span>
+                            <Checkbox
+                              checked={room.securityDeposit.startsWith('none|')}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  updateRoom(room.id, 'securityDeposit', `none|${room.securityDeposit || '2 Month'}`);
+                                } else {
+                                  updateRoom(room.id, 'securityDeposit', room.securityDeposit.replace('none|', ''));
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
+                        <div className={`flex gap-2 transition-opacity ${room.securityDeposit.startsWith('none|') ? 'opacity-40 pointer-events-none' : ''}`}>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={99}
+                            placeholder="Ex: 2"
+                            value={(room.securityDeposit.replace('none|', ''))?.split(' ')[0] || ''}
+                            onChange={(e) => {
+                              const raw = room.securityDeposit.replace('none|', '');
+                              const unit = raw?.split(' ')[1] || 'Month';
+                              updateRoom(room.id, 'securityDeposit', e.target.value ? `${e.target.value} ${unit}` : '');
+                            }}
+                            className="flex-1"
+                          />
+                          <Select
+                            value={(room.securityDeposit.replace('none|', ''))?.split(' ')[1] || 'Month'}
+                            onValueChange={(unit) => {
+                              const raw = room.securityDeposit.replace('none|', '');
+                              const count = raw?.split(' ')[0] || '';
+                              updateRoom(room.id, 'securityDeposit', count ? `${count} ${unit}` : '');
+                            }}
+                          >
+                            <SelectTrigger className="w-[100px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Day">Day</SelectItem>
+                              <SelectItem value="Month">Month</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {Number((room.securityDeposit.replace('none|', ''))?.split(' ')[0]) > 99 && <p className="text-xs text-destructive">Max allowed: 99</p>}
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label>Brokerage <span className="text-destructive">*</span></Label>
+                          <label className="flex items-center gap-1.5 cursor-pointer">
+                            <span className="text-xs text-muted-foreground">No Brokerage</span>
+                            <Checkbox
+                              checked={room.brokerage.startsWith('none|')}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  updateRoom(room.id, 'brokerage', `none|${room.brokerage || '15 Day'}`);
+                                } else {
+                                  updateRoom(room.id, 'brokerage', room.brokerage.replace('none|', ''));
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
+                        <div className={`flex gap-2 transition-opacity ${room.brokerage.startsWith('none|') ? 'opacity-40 pointer-events-none' : ''}`}>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={99}
+                            placeholder="Ex: 1"
+                            value={(room.brokerage.replace('none|', ''))?.split(' ')[0] || ''}
+                            onChange={(e) => {
+                              const raw = room.brokerage.replace('none|', '');
+                              const unit = raw?.split(' ')[1] || 'Month';
+                              updateRoom(room.id, 'brokerage', e.target.value ? `${e.target.value} ${unit}` : '');
+                            }}
+                            className="flex-1"
+                          />
+                          <Select
+                            value={(room.brokerage.replace('none|', ''))?.split(' ')[1] || 'Month'}
+                            onValueChange={(unit) => {
+                              const raw = room.brokerage.replace('none|', '');
+                              const count = raw?.split(' ')[0] || '';
+                              updateRoom(room.id, 'brokerage', count ? `${count} ${unit}` : '');
+                            }}
+                          >
+                            <SelectTrigger className="w-[100px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Day">Day</SelectItem>
+                              <SelectItem value="Month">Month</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {Number((room.brokerage.replace('none|', ''))?.split(' ')[0]) > 99 && <p className="text-xs text-destructive">Max allowed: 99</p>}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`available-${room.id}`}>Available From <span className="text-destructive">*</span></Label>
+                      <Input
+                        id={`available-${room.id}`}
+                        type="date"
+                        className="w-fit"
+                        value={room.availableFrom}
+                        onChange={(e) => updateRoom(room.id, 'availableFrom', e.target.value)}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`description-${room.id}`}>Room Description</Label>
+                      <Textarea
+                        id={`description-${room.id}`}
+                        placeholder="Describe the room — size, view, natural light, attached bathroom, etc."
+                        value={room.description || ""}
+                        onChange={(e) => updateRoom(room.id, 'description', e.target.value)}
+                        maxLength={800}
+                        rows={3}
+                      />
+                      <p className="text-xs text-muted-foreground text-right">{(room.description || "").length}/800</p>
+                    </div>
+
+                    <div className="space-y-3">
+                      <Label>Room Amenities</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {roomAmenitiesList.map((amenity) => (
+                          <div key={amenity} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`room-${room.id}-${amenity}`}
+                              checked={room.amenities?.includes(amenity) || false}
+                              onCheckedChange={() => handleRoomAmenityToggle(room.id, amenity)}
+                            />
+                            <Label htmlFor={`room-${room.id}-${amenity}`} className="text-sm">{amenity}</Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <Label className="flex items-center gap-2">
+                        <Camera className="w-4 h-4" />
+                        Room Photos & Videos <span className="text-destructive">*</span>
+                      </Label>
+                      <MediaUpload
+                        value={room.media || []}
+                        onChange={(mediaFiles) => handleRoomMediaChange(room.id, mediaFiles)}
+                        maxFiles={5}
+                        acceptedTypes={['image/*', 'video/*']}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Common Amenities Section */}
