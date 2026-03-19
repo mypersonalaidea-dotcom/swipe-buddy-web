@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MediaUpload } from "@/components/ui/media-upload";
+import { AddressAutocomplete } from "@/components/map/AddressAutocomplete";
 import { Home, Camera, Plus, Trash2, DoorOpen, Building2, Calendar } from "lucide-react";
 
 interface MediaFile {
@@ -35,6 +36,8 @@ interface HousingDetailsData {
   // For flat owners
   flatDetails: {
     address: string;
+    /** Lat/Lng coordinates from the address autocomplete [lng, lat] */
+    coordinates?: [number, number];
     city: string;
     state: string;
     flatType: string;
@@ -265,11 +268,24 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="flat-address">Flat Address <span className="text-destructive">*</span></Label>
-              <Input
+              <AddressAutocomplete
                 id="flat-address"
-                placeholder="123 Main St, Sector 69"
                 value={data.flatDetails.address}
-                onChange={(e) => handleFlatDetailsChange('address', e.target.value)}
+                placeholder="Search for your flat address..."
+                countryCode="in"
+                onSelect={(result) => {
+                  onUpdate({
+                    ...data,
+                    flatDetails: {
+                      ...data.flatDetails,
+                      address: result.fullAddress,
+                      coordinates: result.coordinates,
+                      city: result.components.locality ?? data.flatDetails.city,
+                      state: result.components.state ?? data.flatDetails.state,
+                    },
+                  });
+                }}
+                onChange={(val) => handleFlatDetailsChange('address', val)}
               />
             </div>
 
