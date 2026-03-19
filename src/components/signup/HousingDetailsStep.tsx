@@ -179,6 +179,22 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
         !!data.flatDetails.flatFurnishing &&
         Array.isArray(data.flatDetails.commonMedia) &&
         data.flatDetails.commonMedia.length > 0;
+
+      // Room validation: every room must have all mandatory fields filled
+      const rooms = data.flatDetails.rooms || [];
+      if (rooms.length > 0) {
+        const allRoomsValid = rooms.every(room =>
+          !!room.roomType &&
+          !!room.quantity &&
+          !!room.rent &&
+          !!room.securityDeposit &&
+          !!room.brokerage &&
+          !!room.availableFrom &&
+          Array.isArray(room.media) &&
+          room.media.length > 0
+        );
+        isValid = isValid && allRoomsValid;
+      }
     }
   }
 
@@ -375,7 +391,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                       </div>
 
                       <div className="space-y-2">
-                        <Label>Room Type</Label>
+                        <Label>Room Type <span className="text-destructive">*</span></Label>
                         <RadioGroup
                           value={room.roomType}
                           onValueChange={(value) => updateRoom(room.id, 'roomType', value)}
@@ -392,7 +408,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
 
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-2">
-                          <Label htmlFor={`quantity-${room.id}`}>Available Quantity</Label>
+                          <Label htmlFor={`quantity-${room.id}`}>Available Quantity <span className="text-destructive">*</span></Label>
                           <Input
                             id={`quantity-${room.id}`}
                             type="number"
@@ -403,7 +419,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor={`rent-${room.id}`}>Rent (₹/month)</Label>
+                          <Label htmlFor={`rent-${room.id}`}>Rent (₹/month) <span className="text-destructive">*</span></Label>
                           <Input
                             id={`rent-${room.id}`}
                             type="number"
@@ -417,7 +433,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
-                            <Label>Security Deposit</Label>
+                            <Label>Security Deposit <span className="text-destructive">*</span></Label>
                             <label className="flex items-center gap-1.5 cursor-pointer">
                               <span className="text-xs text-muted-foreground">No Deposit</span>
                               <Checkbox
@@ -465,7 +481,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                         </div>
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
-                            <Label>Brokerage</Label>
+                            <Label>Brokerage <span className="text-destructive">*</span></Label>
                             <label className="flex items-center gap-1.5 cursor-pointer">
                               <span className="text-xs text-muted-foreground">No Brokerage</span>
                               <Checkbox
@@ -514,7 +530,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor={`available-${room.id}`}>Available From</Label>
+                        <Label htmlFor={`available-${room.id}`}>Available From <span className="text-destructive">*</span></Label>
                         <Input
                           id={`available-${room.id}`}
                           type="date"
@@ -543,7 +559,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                       <div className="space-y-3">
                         <Label className="flex items-center gap-2">
                           <Camera className="w-4 h-4" />
-                          Room Photos & Videos
+                          Room Photos & Videos <span className="text-destructive">*</span>
                         </Label>
                         <MediaUpload
                           value={room.media || []}
