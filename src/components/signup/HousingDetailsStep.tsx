@@ -442,11 +442,8 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                           value={room.quantity}
                           onChange={(e) => {
                             const val = e.target.value;
-                            if (Number(val) > 99) {
-                              updateRoom(room.id, 'quantity', '99');
-                            } else {
-                              updateRoom(room.id, 'quantity', val);
-                            }
+                            if (Number(val) > 99) return;
+                            updateRoom(room.id, 'quantity', val);
                           }}
                         />
                         {Number(room.quantity) >= 99 && <p className="text-xs text-destructive">Max allowed: 99</p>}
@@ -460,11 +457,8 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                           value={room.rent}
                           onChange={(e) => {
                             const val = e.target.value;
-                            if (Number(val) > 9999999) {
-                              updateRoom(room.id, 'rent', '9999999');
-                            } else {
-                              updateRoom(room.id, 'rent', val);
-                            }
+                            if (Number(val) > 9999999) return;
+                            updateRoom(room.id, 'rent', val);
                           }}
                         />
                         {Number(room.rent) >= 9999999 && <p className="text-xs text-destructive">Max allowed: 99,99,999</p>}
@@ -499,11 +493,8 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                               const raw = room.securityDeposit.replace('none|', '');
                               const unit = raw?.split(' ')[1] || 'Month';
                               const val = e.target.value;
-                              if (Number(val) > 99) {
-                                updateRoom(room.id, 'securityDeposit', `99 ${unit}`);
-                              } else {
-                                updateRoom(room.id, 'securityDeposit', val ? `${val} ${unit}` : '');
-                              }
+                              if (Number(val) > 99) return;
+                              updateRoom(room.id, 'securityDeposit', val ? `${val} ${unit}` : '');
                             }}
                             className="flex-1"
                           />
@@ -553,11 +544,8 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                               const raw = room.brokerage.replace('none|', '');
                               const unit = raw?.split(' ')[1] || 'Month';
                               const val = e.target.value;
-                              if (Number(val) > 99) {
-                                updateRoom(room.id, 'brokerage', `99 ${unit}`);
-                              } else {
-                                updateRoom(room.id, 'brokerage', val ? `${val} ${unit}` : '');
-                              }
+                              if (Number(val) > 99) return;
+                              updateRoom(room.id, 'brokerage', val ? `${val} ${unit}` : '');
                             }}
                             className="flex-1"
                           />
