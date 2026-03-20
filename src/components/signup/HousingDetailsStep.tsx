@@ -438,24 +438,36 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                           id={`quantity-${room.id}`}
                           type="number"
                           min={1}
-                          max={99}
                           placeholder="1"
                           value={room.quantity}
-                          onChange={(e) => updateRoom(room.id, 'quantity', e.target.value)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (Number(val) > 99) {
+                              updateRoom(room.id, 'quantity', '99');
+                            } else {
+                              updateRoom(room.id, 'quantity', val);
+                            }
+                          }}
                         />
-                        {Number(room.quantity) > 99 && <p className="text-xs text-destructive">Max allowed: 99</p>}
+                        {Number(room.quantity) >= 99 && <p className="text-xs text-destructive">Max allowed: 99</p>}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor={`rent-${room.id}`}>Rent (₹/month) <span className="text-destructive">*</span></Label>
                         <Input
                           id={`rent-${room.id}`}
                           type="number"
-                          max={9999999}
                           placeholder="Ex: 15000"
                           value={room.rent}
-                          onChange={(e) => updateRoom(room.id, 'rent', e.target.value)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (Number(val) > 9999999) {
+                              updateRoom(room.id, 'rent', '9999999');
+                            } else {
+                              updateRoom(room.id, 'rent', val);
+                            }
+                          }}
                         />
-                        {Number(room.rent) > 9999999 && <p className="text-xs text-destructive">Max allowed: 99,99,999</p>}
+                        {Number(room.rent) >= 9999999 && <p className="text-xs text-destructive">Max allowed: 99,99,999</p>}
                       </div>
                     </div>
 
@@ -481,13 +493,17 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                           <Input
                             type="number"
                             min={1}
-                            max={99}
                             placeholder="Ex: 2"
                             value={(room.securityDeposit.replace('none|', ''))?.split(' ')[0] || ''}
                             onChange={(e) => {
                               const raw = room.securityDeposit.replace('none|', '');
                               const unit = raw?.split(' ')[1] || 'Month';
-                              updateRoom(room.id, 'securityDeposit', e.target.value ? `${e.target.value} ${unit}` : '');
+                              const val = e.target.value;
+                              if (Number(val) > 99) {
+                                updateRoom(room.id, 'securityDeposit', `99 ${unit}`);
+                              } else {
+                                updateRoom(room.id, 'securityDeposit', val ? `${val} ${unit}` : '');
+                              }
                             }}
                             className="flex-1"
                           />
@@ -508,7 +524,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                             </SelectContent>
                           </Select>
                         </div>
-                        {Number((room.securityDeposit.replace('none|', ''))?.split(' ')[0]) > 99 && <p className="text-xs text-destructive">Max allowed: 99</p>}
+                        {Number((room.securityDeposit.replace('none|', ''))?.split(' ')[0]) >= 99 && <p className="text-xs text-destructive">Max allowed: 99</p>}
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
@@ -531,13 +547,17 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                           <Input
                             type="number"
                             min={1}
-                            max={99}
                             placeholder="Ex: 1"
                             value={(room.brokerage.replace('none|', ''))?.split(' ')[0] || ''}
                             onChange={(e) => {
                               const raw = room.brokerage.replace('none|', '');
                               const unit = raw?.split(' ')[1] || 'Month';
-                              updateRoom(room.id, 'brokerage', e.target.value ? `${e.target.value} ${unit}` : '');
+                              const val = e.target.value;
+                              if (Number(val) > 99) {
+                                updateRoom(room.id, 'brokerage', `99 ${unit}`);
+                              } else {
+                                updateRoom(room.id, 'brokerage', val ? `${val} ${unit}` : '');
+                              }
                             }}
                             className="flex-1"
                           />
@@ -558,7 +578,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                             </SelectContent>
                           </Select>
                         </div>
-                        {Number((room.brokerage.replace('none|', ''))?.split(' ')[0]) > 99 && <p className="text-xs text-destructive">Max allowed: 99</p>}
+                        {Number((room.brokerage.replace('none|', ''))?.split(' ')[0]) >= 99 && <p className="text-xs text-destructive">Max allowed: 99</p>}
                       </div>
                     </div>
 
@@ -667,7 +687,8 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
             </div>
           </CardContent>
         </Card>
-      )}
+      )
+      }
 
       <div className="flex gap-4">
         <Button onClick={onBack} variant="outline" className="flex-1">
@@ -682,6 +703,6 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
           {isSubmitting ? "Creating Account..." : "Create Account"}
         </Button>
       </div>
-    </div>
+    </div >
   );
 };
