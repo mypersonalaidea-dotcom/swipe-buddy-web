@@ -75,6 +75,19 @@ const roomTypeLabels = {
 };
 
 export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitting }: HousingDetailsStepProps) => {
+  const [maxHitFields, setMaxHitFields] = useState<Set<string>>(new Set());
+
+  const flashMaxHit = (key: string) => {
+    setMaxHitFields(prev => new Set(prev).add(key));
+    setTimeout(() => {
+      setMaxHitFields(prev => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }, 2000);
+  };
+
   const handleInputChange = (field: keyof HousingDetailsData, value: any) => {
     onUpdate({ ...data, [field]: value });
   };
@@ -442,11 +455,14 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                           value={room.quantity}
                           onChange={(e) => {
                             const val = e.target.value;
-                            if (Number(val) > 99) return;
+                            if (Number(val) > 99) {
+                              flashMaxHit(`${room.id}-quantity`);
+                              return;
+                            }
                             updateRoom(room.id, 'quantity', val);
                           }}
                         />
-                        {Number(room.quantity) >= 99 && <p className="text-xs text-destructive">Max allowed: 99</p>}
+                        {(Number(room.quantity) >= 99 || maxHitFields.has(`${room.id}-quantity`)) && <p className="text-xs text-destructive">Max allowed: 99</p>}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor={`rent-${room.id}`}>Rent (₹/month) <span className="text-destructive">*</span></Label>
@@ -457,11 +473,14 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                           value={room.rent}
                           onChange={(e) => {
                             const val = e.target.value;
-                            if (Number(val) > 9999999) return;
+                            if (Number(val) > 9999999) {
+                              flashMaxHit(`${room.id}-rent`);
+                              return;
+                            }
                             updateRoom(room.id, 'rent', val);
                           }}
                         />
-                        {Number(room.rent) >= 9999999 && <p className="text-xs text-destructive">Max allowed: 99,99,999</p>}
+                        {(Number(room.rent) >= 9999999 || maxHitFields.has(`${room.id}-rent`)) && <p className="text-xs text-destructive">Max allowed: 99,99,999</p>}
                       </div>
                     </div>
 
@@ -493,7 +512,10 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                               const raw = room.securityDeposit.replace('none|', '');
                               const unit = raw?.split(' ')[1] || 'Month';
                               const val = e.target.value;
-                              if (Number(val) > 99) return;
+                              if (Number(val) > 99) {
+                                flashMaxHit(`${room.id}-deposit`);
+                                return;
+                              }
                               updateRoom(room.id, 'securityDeposit', val ? `${val} ${unit}` : '');
                             }}
                             className="flex-1"
@@ -515,7 +537,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                             </SelectContent>
                           </Select>
                         </div>
-                        {Number((room.securityDeposit.replace('none|', ''))?.split(' ')[0]) >= 99 && <p className="text-xs text-destructive">Max allowed: 99</p>}
+                        {(Number((room.securityDeposit.replace('none|', ''))?.split(' ')[0]) >= 99 || maxHitFields.has(`${room.id}-deposit`)) && <p className="text-xs text-destructive">Max allowed: 99</p>}
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
@@ -544,7 +566,10 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                               const raw = room.brokerage.replace('none|', '');
                               const unit = raw?.split(' ')[1] || 'Month';
                               const val = e.target.value;
-                              if (Number(val) > 99) return;
+                              if (Number(val) > 99) {
+                                flashMaxHit(`${room.id}-brokerage`);
+                                return;
+                              }
                               updateRoom(room.id, 'brokerage', val ? `${val} ${unit}` : '');
                             }}
                             className="flex-1"
@@ -566,7 +591,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                             </SelectContent>
                           </Select>
                         </div>
-                        {Number((room.brokerage.replace('none|', ''))?.split(' ')[0]) >= 99 && <p className="text-xs text-destructive">Max allowed: 99</p>}
+                        {(Number((room.brokerage.replace('none|', ''))?.split(' ')[0]) >= 99 || maxHitFields.has(`${room.id}-brokerage`)) && <p className="text-xs text-destructive">Max allowed: 99</p>}
                       </div>
                     </div>
 
