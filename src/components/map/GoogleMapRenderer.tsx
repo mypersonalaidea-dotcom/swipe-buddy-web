@@ -11,7 +11,7 @@
 
 import { useEffect, useRef } from 'react';
 import { loadGoogleMapsScript } from '@/lib/maps/googleProvider';
-import { googleReverseGeocode } from '@/lib/maps/googleProvider';
+import { reverseGeocodeCoords } from '@/lib/maps/useMaps';
 import type { GeocodeResult, LngLat } from '@/lib/maps/types';
 
 interface GoogleMapRendererProps {
@@ -73,7 +73,7 @@ export function GoogleMapRenderer({
         if (!pos) return;
         const coords: LngLat = [pos.lng(), pos.lat()];
         try {
-          const result = await googleReverseGeocode(coords);
+          const result = await reverseGeocodeCoords(coords);
           onMarkerDragEnd?.(result);
           updateCircle(map, coords, currentRadiusRef.current, circleRef);
         } catch (err) {

@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { MAPBOX_TOKEN } from '@/lib/maps/config';
-import { mapboxReverseGeocode } from '@/lib/maps/mapboxProvider';
+import { reverseGeocodeCoords } from '@/lib/maps/useMaps';
 import type { GeocodeResult, LngLat } from '@/lib/maps/types';
 import { AlertTriangle, ExternalLink } from 'lucide-react';
 
@@ -110,7 +110,7 @@ export function MapboxMapRenderer({
       const coords: LngLat = [lngLat.lng, lngLat.lat];
       currentCenterRef.current = coords;
       try {
-        const result = await mapboxReverseGeocode(coords);
+        const result = await reverseGeocodeCoords(coords);
         onMarkerDragEnd?.(result);
         if (map.isStyleLoaded()) {
           updateCircle(map, coords, currentRadiusRef.current);

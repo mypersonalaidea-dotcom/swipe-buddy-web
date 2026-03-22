@@ -2,14 +2,17 @@
  * ============================================================
  * useMaps — unified hook for all geocoding operations
  * ============================================================
- * Automatically routes calls to the correct provider based on:
- *   1. The `provider` argument passed to the hook
- *   2. Falling back to the global MAP_PROVIDER in config.ts
+ * Automatically routes calls to the correct provider:
+ *
+ *   • Autocomplete / geocoding → GEOCODE_PROVIDER (Mapbox)
+ *   • Map rendering            → MAP_PROVIDER (Google)
+ *
+ * The hook returns functions that always use the geocoding
+ * provider. The map renderer is chosen separately in
+ * MapPicker.tsx and other map-rendering components.
  *
  * Usage:
- *   const maps = useMaps();               // uses global default
- *   const maps = useMaps('google');       // force Google for this hook
- *
+ *   const maps = useMaps();
  *   const suggestions = await maps.autocomplete('Connaught Place');
  *   const result      = await maps.resolve(suggestion);
  *   const result      = await maps.geocode('India Gate, New Delhi');
@@ -18,7 +21,7 @@
  */
 
 import { useCallback } from 'react';
-import { MAP_PROVIDER, type MapProvider } from './config';
+import { GEOCODE_PROVIDER, MAP_PROVIDER, type MapProvider } from './config';
 import type { GeocodeResult, LngLat, PlaceSuggestion } from './types';
 
 import {
@@ -36,13 +39,15 @@ import {
 } from './googleProvider';
 
 export interface UseMapsReturn {
-  /** The active provider for this hook instance */
+  /** The provider used for geocoding / autocomplete */
   provider: MapProvider;
+
+  /** The provider used for map rendering */
+  mapProvider: MapProvider;
 
   /**
    * Get autocomplete suggestions as the user types.
-   * @param query  - partial address string
-   * @param options - optional country restriction (e.g. 'in')
+   * Uses GEOCODE_PROVIDER (Mapbox).
    */
   autocomplete: (
     query: string,
@@ -51,26 +56,29 @@ export interface UseMapsReturn {
 
   /**
    * Resolve a PlaceSuggestion (from autocomplete dropdown) into full details.
+   * Uses GEOCODE_PROVIDER (Mapbox).
    */
   resolve: (suggestion: PlaceSuggestion) => Promise<GeocodeResult>;
 
   /**
    * Forward geocode: convert address string → coordinates + details.
+   * Uses GEOCODE_PROVIDER (Mapbox).
    */
   geocode: (address: string, options?: { country?: string }) => Promise<GeocodeResult>;
 
   /**
    * Reverse geocode: convert coordinates → address string + details.
+   * Uses GEOCODE_PROVIDER (Mapbox).
    */
   reverseGeocode: (coords: LngLat) => Promise<GeocodeResult>;
 }
 
 /**
- * Hook that returns provider-agnostic geocoding functions.
- * @param overrideProvider  Optional — override the global MAP_PROVIDER for this instance.
+ * Hook that returns geocoding functions using the configured GEOCODE_PROVIDER.
+ * @param overrideGeoProvider  Optional — override the global GEOCODE_PROVIDER for this instance.
  */
-export function useMaps(overrideProvider?: MapProvider): UseMapsReturn {
-  const provider: MapProvider = overrideProvider ?? MAP_PROVIDER;
+export function useMaps(overrideGeoProvider?: MapProvider): UseMapsReturn {
+  const provider: MapProvider = overrideGeoProvider ?? GEOCODE_PROVIDER;
 
   const autocomplete = useCallback(
     (query: string, options?: { country?: string; proximity?: LngLat }) => {
@@ -104,14 +112,14 @@ export function useMaps(overrideProvider?: MapProvider): UseMapsReturn {
     [provider],
   );
 
-  return { provider, autocomplete, resolve, geocode, reverseGeocode };
+  return { provider, mapProvider: MAP_PROVIDER, autocomplete, resolve, geocode, reverseGeocode };
 }
 
 // ── Convenience standalone functions (no React context required) ──────────
 
 export async function geocodeAddress(
   address: string,
-  provider: MapProvider = MAP_PROVIDER,
+  provider: MapProvider = GEOCODE_PROVIDER,
 ): Promise<GeocodeResult> {
   if (provider === 'mapbox') return mapboxGeocode(address);
   return googleGeocode(address);
@@ -119,7 +127,7 @@ export async function geocodeAddress(
 
 export async function reverseGeocodeCoords(
   coords: LngLat,
-  provider: MapProvider = MAP_PROVIDER,
+  provider: MapProvider = GEOCODE_PROVIDER,
 ): Promise<GeocodeResult> {
   if (provider === 'mapbox') return mapboxReverseGeocode(coords);
   return googleReverseGeocode(coords);
