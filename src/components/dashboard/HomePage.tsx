@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { habitCategories, getCategoryForHabit } from "@/constants/habits";
 import { ChevronLeft, ChevronRight, SlidersHorizontal, ChevronDown, Home, Users, Heart, Building2, Briefcase, GraduationCap, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,10 @@ import { MediaUpload } from "@/components/ui/media-upload";
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { BrandMultiSelect, BrandOption } from "@/components/ui/brand-multi-select";
+import { AddressAutocomplete } from "@/components/map/AddressAutocomplete";
+import { GoogleMapRenderer } from "@/components/map/GoogleMapRenderer";
+import { DEFAULT_MAP_CENTER } from "@/lib/maps/config";
+import type { GeocodeResult, LngLat } from "@/lib/maps/types";
 
 // ---- Types for flat details ----
 interface MediaFile {
@@ -82,6 +86,9 @@ export const HomePage = () => {
     educationExperiences: [] as { id: string; institution: string; degree: string; startYear: string; endYear: string }[],
     flatDetails: {
       address: flat.address ?? "",
+      coordinates: flat.latitude && flat.longitude
+        ? [parseFloat(flat.longitude), parseFloat(flat.latitude)] as [number, number]
+        : undefined,
       furnishingType: flat.furnishing_type ?? "",
       commonAmenities: flat.common_amenities?.map(a => a.amenity.name) ?? [],
       commonPhotos: flat.media?.filter(m => m.media_type === "image").map(m => m.media_url) ?? [],
@@ -136,6 +143,8 @@ export const HomePage = () => {
 
   // --- Flat filters ---
   const [locationSearch, setLocationSearch] = useState("");
+  const [filterMapCenter, setFilterMapCenter] = useState<LngLat>(DEFAULT_MAP_CENTER);
+  const [filterCoordinates, setFilterCoordinates] = useState<LngLat | null>(null);
   const [locationRange, setLocationRange] = useState([5]);
   const [priceRange, setPriceRange] = useState([0, 100000]);
   const [flatTypes, setFlatTypes] = useState<string[]>([]);
@@ -146,6 +155,12 @@ export const HomePage = () => {
   const [securityDeposit, setSecurityDeposit] = useState("");
   const [roomAmenities, setRoomAmenities] = useState<string[]>([]);
   const [commonAreaAmenities, setCommonAreaAmenities] = useState<string[]>([]);
+
+  const handleFilterLocationSelect = useCallback((result: GeocodeResult) => {
+    setLocationSearch(result.fullAddress);
+    setFilterMapCenter(result.coordinates);
+    setFilterCoordinates(result.coordinates);
+  }, []);
   const [flatFilterHabits, setFlatFilterHabits] = useState<string[]>([]);
   const handleFlatHabitToggle = (habit: string) => {
     setFlatFilterHabits(prev => prev.includes(habit) ? prev.filter(h => h !== habit) : [...prev, habit]);
@@ -376,9 +391,21 @@ export const HomePage = () => {
                   <div className="border-t px-4 pb-4 pt-3 space-y-4">
                     <div className="space-y-2">
                       <Label>Location</Label>
-                      <input type="text" placeholder="Search location..." value={locationSearch} onChange={(e) => setLocationSearch(e.target.value)} className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm" />
-                      <div className="h-40 bg-muted rounded-md flex items-center justify-center text-muted-foreground text-sm">
-                        Map Preview (Mapbox integration pending)
+                      <AddressAutocomplete
+                        value={locationSearch}
+                        placeholder="Search location..."
+                        onSelect={handleFilterLocationSelect}
+                        onChange={setLocationSearch}
+                        countryCode="in"
+                      />
+                      <div className="rounded-lg overflow-hidden border border-border">
+                        <GoogleMapRenderer
+                          center={filterMapCenter}
+                          zoom={12}
+                          radius={locationRange[0]}
+                          onMarkerDragEnd={handleFilterLocationSelect}
+                          height="160px"
+                        />
                       </div>
                     </div>
                     <div className="space-y-2">

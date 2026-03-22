@@ -4,7 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { MapPin, Briefcase, GraduationCap, Home, Send, Bookmark, MoreVertical, Flag, ShieldOff, ExternalLink } from "lucide-react";
-import { MAPBOX_TOKEN } from "@/lib/maps/config";
+import { MAPBOX_TOKEN, GOOGLE_MAPS_API_KEY, MAP_PROVIDER } from "@/lib/maps/config";
 import { getHabitIcon } from "@/constants/habits";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -209,36 +209,63 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                     </div>
                   </div>
 
-                  {/* Location Map — Mapbox Static Image */}
+                  {/* Location Map — Static Image */}
                   <div className="relative h-32 bg-muted border-t md:border-t-0 md:border-l border-border md:col-span-2 overflow-hidden">
-                    {profile.flatDetails.coordinates && MAPBOX_TOKEN && MAPBOX_TOKEN.startsWith('pk.') ? (
-                      <>
-                        <img
-                          src={
-                            `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/` +
-                            `pin-s+6366f1(${profile.flatDetails.coordinates[0]},${profile.flatDetails.coordinates[1]})/` +
-                            `${profile.flatDetails.coordinates[0]},${profile.flatDetails.coordinates[1]},14/` +
-                            `400x128@2x?access_token=${MAPBOX_TOKEN}`
-                          }
-                          alt="Flat location map"
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                        <a
-                          href={`https://www.google.com/maps?q=${profile.flatDetails.coordinates[1]},${profile.flatDetails.coordinates[0]}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="absolute bottom-1.5 right-1.5 flex items-center gap-1 text-[10px] bg-background/90 backdrop-blur-sm px-1.5 py-0.5 rounded-full border border-border text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          Open in Maps <ExternalLink className="w-2.5 h-2.5" />
-                        </a>
-                      </>
-                    ) : (
-                      <div className="h-full flex flex-col items-center justify-center gap-1.5">
-                        <MapPin className="w-5 h-5 text-muted-foreground/40" />
-                        <p className="text-muted-foreground text-xs">No location found</p>
-                      </div>
-                    )}
+                    {(() => {
+                      const coords = profile.flatDetails.coordinates;
+                      if (!coords) {
+                        return (
+                          <div className="h-full flex flex-col items-center justify-center gap-1.5">
+                            <MapPin className="w-5 h-5 text-muted-foreground/40" />
+                            <p className="text-muted-foreground text-xs">No location found</p>
+                          </div>
+                        );
+                      }
+
+                      const [lng, lat] = coords;
+                      let staticMapUrl = '';
+
+                      if (MAP_PROVIDER === 'google' && GOOGLE_MAPS_API_KEY) {
+                        staticMapUrl =
+                          `https://maps.googleapis.com/maps/api/staticmap?` +
+                          `center=${lat},${lng}&zoom=14&size=400x128&scale=2&maptype=roadmap` +
+                          `&markers=color:0x6366f1%7C${lat},${lng}` +
+                          `&key=${GOOGLE_MAPS_API_KEY}`;
+                      } else if (MAPBOX_TOKEN && MAPBOX_TOKEN.startsWith('pk.')) {
+                        staticMapUrl =
+                          `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/` +
+                          `pin-s+6366f1(${lng},${lat})/` +
+                          `${lng},${lat},14/400x128@2x?access_token=${MAPBOX_TOKEN}`;
+                      }
+
+                      if (!staticMapUrl) {
+                        return (
+                          <div className="h-full flex flex-col items-center justify-center gap-1.5">
+                            <MapPin className="w-5 h-5 text-muted-foreground/40" />
+                            <p className="text-muted-foreground text-xs">No map token configured</p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <>
+                          <img
+                            src={staticMapUrl}
+                            alt="Flat location map"
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                          <a
+                            href={`https://www.google.com/maps?q=${lat},${lng}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="absolute bottom-1.5 right-1.5 flex items-center gap-1 text-[10px] bg-background/90 backdrop-blur-sm px-1.5 py-0.5 rounded-full border border-border text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            Open in Maps <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

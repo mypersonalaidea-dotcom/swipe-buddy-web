@@ -20,6 +20,8 @@ export interface Flat {
   city: string;
   state: string;
   pincode?: string;
+  latitude?: string | null;
+  longitude?: string | null;
   furnishing_type: string;
   description?: string;
   is_published: boolean;
