@@ -333,52 +333,92 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
     const target = type === "phone" ? `${countryCode} ${data.phone}` : data.email;
     toast({
       title: type === "phone" ? "OTP Sent! 📱" : "OTP Sent! 📧",
-      description: `Verification code sent to ${target}. Demo OTP: 123456`,
+      description: `Verification code sent to ${target}`,
     });
   };
 
-  const handleOtpVerify = () => {
+  const handleOtpVerify = async () => {
     if (otpValue.length !== 6) {
       setOtpError("Please enter the complete 6-digit OTP");
       return;
     }
 
-    // Mock: accept 123456 as valid OTP
-    if (otpValue !== "123456") {
-      setOtpError("Invalid OTP. Please try again. (Demo OTP: 123456)");
-      return;
-    }
-
     setOtpVerifying(true);
-    setTimeout(() => {
+    setOtpError("");
+
+    try {
       if (otpType === "phone") {
-        handleInputChange('phoneVerified', true);
-        toast({
-          title: "Phone Verified! ✅",
-          description: "Your phone number has been verified successfully.",
+        // Verify OTP via backend
+        const res = await api.post("/auth/verify-otp", {
+          phone: data.phone,
+          otp: otpValue,
         });
+
+        if (res.data?.success || res.data?.data?.verified) {
+          handleInputChange('phoneVerified', true);
+          toast({
+            title: "Phone Verified! ✅",
+            description: "Your phone number has been verified successfully.",
+          });
+          setOtpDialogOpen(false);
+        } else {
+          setOtpError(res.data?.message || "Invalid OTP. Please try again.");
+        }
       } else {
-        handleInputChange('emailVerified', true);
-        toast({
-          title: "Email Verified! ✅",
-          description: "Your email has been verified successfully.",
+        // Email OTP verification via backend
+        const res = await api.post("/auth/verify-otp", {
+          email: data.email,
+          otp: otpValue,
         });
+
+        if (res.data?.success || res.data?.data?.verified) {
+          handleInputChange('emailVerified', true);
+          toast({
+            title: "Email Verified! ✅",
+            description: "Your email has been verified successfully.",
+          });
+          setOtpDialogOpen(false);
+        } else {
+          setOtpError(res.data?.message || "Invalid OTP. Please try again.");
+        }
       }
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.message ||
+        err?.friendlyMessage ||
+        "Verification failed. Please try again.";
+      setOtpError(message);
+    } finally {
       setOtpVerifying(false);
-      setOtpDialogOpen(false);
-    }, 800);
+    }
   };
 
-  const handleResendOtp = () => {
+  const handleResendOtp = async () => {
     if (otpCountdown > 0) return;
-    setOtpCountdown(30);
     setOtpValue("");
     setOtpError("");
-    const target = otpType === "phone" ? `${countryCode} ${data.phone}` : data.email;
-    toast({
-      title: "OTP Resent! 🔄",
-      description: `New verification code sent to ${target}. Demo OTP: 123456`,
-    });
+
+    try {
+      const target = otpType === "phone" ? data.phone : data.email;
+      await api.post("/auth/send-otp", {
+        ...(otpType === "phone" ? { phone: target } : { email: target }),
+      });
+      setOtpCountdown(30);
+      toast({
+        title: "OTP Resent! 🔄",
+        description: `New verification code sent to ${otpType === "phone" ? `${countryCode} ${data.phone}` : data.email}`,
+      });
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.message ||
+        err?.friendlyMessage ||
+        "Failed to resend OTP. Please try again.";
+      toast({
+        title: "Resend Failed",
+        description: message,
+        variant: "destructive",
+      });
+    }
   };
 
   const handleVerifyPhone = async () => {

@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Shield, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import api from "@/lib/api";
 
 interface OTPVerificationProps {
   phoneNumber: string;
@@ -28,7 +29,7 @@ export const OTPVerification = ({ phoneNumber, onVerified, onBack }: OTPVerifica
     }
   }, [timeLeft]);
 
-  const handleVerifyOTP = () => {
+  const handleVerifyOTP = async () => {
     if (!otp) {
       toast({
         title: "Error",
@@ -49,10 +50,13 @@ export const OTPVerification = ({ phoneNumber, onVerified, onBack }: OTPVerifica
 
     setIsLoading(true);
 
-    // Demo OTP verification (hardcoded to 123456)
-    setTimeout(() => {
-      setIsLoading(false);
-      if (otp === "123456") {
+    try {
+      const res = await api.post("/auth/verify-otp", {
+        phone: phoneNumber,
+        otp,
+      });
+
+      if (res.data?.success || res.data?.data?.verified) {
         toast({
           title: "Phone Verified! ✅",
           description: "Your phone number has been successfully verified.",
@@ -61,21 +65,47 @@ export const OTPVerification = ({ phoneNumber, onVerified, onBack }: OTPVerifica
       } else {
         toast({
           title: "Invalid OTP",
-          description: "Please enter the correct OTP. For demo: 123456",
+          description: res.data?.message || "Please enter the correct OTP.",
           variant: "destructive",
         });
       }
-    }, 1000);
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.message ||
+        err?.friendlyMessage ||
+        "Verification failed. Please try again.";
+      toast({
+        title: "Invalid OTP",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleResendOTP = () => {
+  const handleResendOTP = async () => {
     setTimeLeft(60);
     setCanResend(false);
     setOtp("");
-    toast({
-      title: "OTP Sent",
-      description: `New OTP sent to ${phoneNumber}. Demo OTP: 123456`,
-    });
+
+    try {
+      await api.post("/auth/send-otp", { phone: phoneNumber });
+      toast({
+        title: "OTP Sent",
+        description: `New OTP sent to ${phoneNumber}`,
+      });
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.message ||
+        err?.friendlyMessage ||
+        "Failed to resend OTP. Please try again.";
+      toast({
+        title: "Resend Failed",
+        description: message,
+        variant: "destructive",
+      });
+    }
   };
 
   const maskedPhone = `${phoneNumber.slice(0, 2)}XXXXXX${phoneNumber.slice(-2)}`;
@@ -96,20 +126,13 @@ export const OTPVerification = ({ phoneNumber, onVerified, onBack }: OTPVerifica
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Demo Notice */}
-          <div className="bg-accent/50 p-3 rounded-lg border border-accent">
-            <p className="text-sm text-foreground text-center">
-              <strong>Demo Mode:</strong> Use OTP <span className="font-mono font-bold">123456</span>
-            </p>
-          </div>
-
           {/* OTP Input */}
           <div className="space-y-2">
             <Label htmlFor="otp">Enter OTP</Label>
             <Input
               id="otp"
               type="text"
-              placeholder="123456"
+              placeholder="Enter 6-digit OTP"
               value={otp}
               onChange={(e) => {
                 const value = e.target.value.replace(/\D/g, '').slice(0, 6);
