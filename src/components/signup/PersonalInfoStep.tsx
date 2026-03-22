@@ -71,7 +71,7 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [countryCode, setCountryCode] = useState("+91");
   const [phoneExistsDialogOpen, setPhoneExistsDialogOpen] = useState(false);
-  const [verifyLoading, setVerifyLoading] = useState(false);
+  const [verifyLoading, setVerifyLoading] = useState<"" | "phone" | "email">("");
 
   // Custom Degree Dialog State
   const [showAddDegreeDialog, setShowAddDegreeDialog] = useState(false);
@@ -431,24 +431,24 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
       return;
     }
 
-    setVerifyLoading(true);
+    setVerifyLoading("phone");
 
     try {
       const res = await api.post("/auth/check-phone", { phone: data.phone });
-      setVerifyLoading(false);
+      setVerifyLoading("");
       if (res.data?.data?.exists) {
         setPhoneExistsDialogOpen(true);
         return;
       }
     } catch (error: any) {
-      setVerifyLoading(false);
+      setVerifyLoading("");
       console.warn("Phone check failed, proceeding with verification:", error);
     }
 
     openOtpDialog("phone");
   };
 
-  const handleVerifyEmail = () => {
+  const handleVerifyEmail = async () => {
     if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
       toast({
         title: "Error",
@@ -457,6 +457,10 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
       });
       return;
     }
+    setVerifyLoading("email");
+    // Brief delay so the user sees the loader
+    await new Promise(resolve => setTimeout(resolve, 600));
+    setVerifyLoading("");
     openOtpDialog("email");
   };
 
@@ -1263,19 +1267,21 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
         </DialogContent>
       </Dialog>
 
-      {/* Phone Verify Loading Dialog */}
-      <Dialog open={verifyLoading} onOpenChange={() => { }}>
+      {/* Verify Loading Dialog */}
+      <Dialog open={!!verifyLoading} onOpenChange={() => { }}>
         <DialogContent className="max-w-[320px] mx-auto p-6 flex flex-col items-center gap-4" onPointerDownOutside={(e) => e.preventDefault()}>
           <div className="relative w-20 h-20">
             <div className="absolute inset-0 rounded-full border-4 border-muted" />
             <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-primary animate-spin" />
             <div className="absolute inset-2 rounded-full border-4 border-transparent border-b-purple-500 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '0.8s' }} />
             <div className="absolute inset-0 flex items-center justify-center">
-              <Phone className="w-6 h-6 text-primary animate-pulse" />
+              {verifyLoading === "phone" ? <Phone className="w-6 h-6 text-primary animate-pulse" /> : <Mail className="w-6 h-6 text-primary animate-pulse" />}
             </div>
           </div>
           <div className="text-center space-y-1">
-            <p className="font-semibold text-foreground">Verifying your phone number...</p>
+            <p className="font-semibold text-foreground">
+              Verifying your {verifyLoading === "phone" ? "phone number" : "email address"}...
+            </p>
             <p className="text-sm text-muted-foreground">Please wait while we check your details</p>
           </div>
           <div className="flex gap-1">
