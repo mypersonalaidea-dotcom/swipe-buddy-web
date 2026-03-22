@@ -366,7 +366,7 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
         }
       } else {
         // Email OTP verification via backend
-        const res = await api.post("/auth/verify-otp", {
+        const res = await api.post("/auth/verify-email-otp", {
           email: data.email,
           otp: otpValue,
         });
@@ -399,10 +399,12 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
     setOtpError("");
 
     try {
-      const target = otpType === "phone" ? data.phone : data.email;
-      await api.post("/auth/send-otp", {
-        ...(otpType === "phone" ? { phone: target } : { email: target }),
-      });
+      if (otpType === "phone") {
+        await api.post("/auth/send-otp", { phone: data.phone });
+      } else {
+        // Use check-email endpoint to resend email OTP
+        await api.post("/auth/check-email", { email: data.email });
+      }
       setOtpCountdown(30);
       toast({
         title: "OTP Resent! 🔄",
@@ -458,10 +460,36 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
       return;
     }
     setVerifyLoading("email");
-    // Brief delay so the user sees the loader
-    await new Promise(resolve => setTimeout(resolve, 600));
-    setVerifyLoading("");
-    openOtpDialog("email");
+
+    try {
+      // Call check-email endpoint to send OTP via Resend
+      const res = await api.post("/auth/check-email", { email: data.email });
+
+      // If the email already exists, inform the user
+      if (res.data?.data?.exists) {
+        toast({
+          title: "Email Already Registered",
+          description: "This email is already linked to an account. Please use a different email or log in.",
+          variant: "destructive",
+        });
+        setVerifyLoading("");
+        return;
+      }
+
+      setVerifyLoading("");
+      openOtpDialog("email");
+    } catch (err: any) {
+      setVerifyLoading("");
+      const message =
+        err?.response?.data?.message ||
+        err?.friendlyMessage ||
+        "Failed to send verification email. Please try again.";
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive",
+      });
+    }
   };
 
   const isPasswordValid = Boolean(
