@@ -19,7 +19,7 @@
 export type MapProvider = 'mapbox' | 'google';
 
 /** ✅ CHANGE THIS to switch the default map provider app-wide */
-export const MAP_PROVIDER: MapProvider = 'mapbox';
+export const MAP_PROVIDER: MapProvider = 'google';
 
 /** Mapbox public access token */
 export const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined;
