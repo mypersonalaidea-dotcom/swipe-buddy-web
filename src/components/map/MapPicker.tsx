@@ -36,7 +36,7 @@ import { AddressAutocomplete } from './AddressAutocomplete';
 import { MapboxMapRenderer } from './MapboxMapRenderer';
 import { GoogleMapRenderer } from './GoogleMapRenderer';
 import { useMaps } from '@/lib/maps/useMaps';
-import { DEFAULT_MAP_CENTER, DEFAULT_RADIUS_KM, DEFAULT_ZOOM, MAP_PROVIDER, GEOCODE_PROVIDER } from '@/lib/maps/config';
+import { DEFAULT_MAP_CENTER, DEFAULT_RADIUS_KM, DEFAULT_ZOOM, MAP_PROVIDER } from '@/lib/maps/config';
 import { cn } from '@/lib/utils';
 import type { GeocodeResult, LngLat, MapPickerProps } from '@/lib/maps/types';
 
@@ -53,10 +53,8 @@ export function MapPicker({
   onRadiusChange,
   className,
 }: MapPickerProps) {
-  // Hybrid: map rendering uses MAP_PROVIDER (Google), geocoding uses GEOCODE_PROVIDER (Mapbox)
-  const mapRendererProvider = MAP_PROVIDER;
-  const geocodeProvider = provider ?? GEOCODE_PROVIDER;
-  const maps = useMaps(geocodeProvider);
+  const activeProvider = provider ?? MAP_PROVIDER;
+  const maps = useMaps(activeProvider);
 
   const [center, setCenter] = useState<LngLat>(
     initialCoords ?? initialCenter ?? DEFAULT_MAP_CENTER,
@@ -105,16 +103,15 @@ export function MapPicker({
     );
   };
 
-  // Map renderer is determined by MAP_PROVIDER (Google)
   const MapRenderer =
-    mapRendererProvider === 'mapbox' ? MapboxMapRenderer : GoogleMapRenderer;
+    activeProvider === 'mapbox' ? MapboxMapRenderer : GoogleMapRenderer;
 
   return (
     <div className={cn('space-y-3', className)}>
       {/* ── Search bar + Use my location ─────────────────────── */}
       <div className="flex gap-2">
         <AddressAutocomplete
-          provider={geocodeProvider}
+          provider={activeProvider}
           value={location}
           placeholder="Search for an address..."
           onSelect={handleLocationSelected}
@@ -148,14 +145,9 @@ export function MapPicker({
           className="w-full rounded-lg overflow-hidden border border-border shadow-sm"
         />
 
-        {/* Provider badges */}
-        <div className="absolute bottom-2 left-2 flex gap-1">
-          <span className="px-2 py-0.5 rounded-full bg-background/80 backdrop-blur-sm border border-border text-[10px] text-muted-foreground pointer-events-none">
-            🗺 {mapRendererProvider === 'mapbox' ? 'Mapbox' : 'Google Maps'}
-          </span>
-          <span className="px-2 py-0.5 rounded-full bg-background/80 backdrop-blur-sm border border-border text-[10px] text-muted-foreground pointer-events-none">
-            📍 {geocodeProvider === 'mapbox' ? 'Mapbox' : 'Google'}
-          </span>
+        {/* Provider badge */}
+        <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-background/80 backdrop-blur-sm border border-border text-[10px] text-muted-foreground pointer-events-none">
+          🗺 {activeProvider === 'mapbox' ? 'Mapbox' : 'Google Maps'}
         </div>
       </div>
 

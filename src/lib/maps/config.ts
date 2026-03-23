@@ -1,42 +1,38 @@
 /**
  * ============================================================
- * 🗺️  MAPS GLOBAL CONFIGURATION — HYBRID MODE
+ * 🗺️  MAPS GLOBAL CONFIGURATION
  * ============================================================
  *
- * This app uses a HYBRID setup with two separate providers:
- *
- *   MAP_PROVIDER      → which SDK renders the interactive map
- *                        ('google' = Google Maps JavaScript API)
- *
- *   GEOCODE_PROVIDER  → which service handles autocomplete,
- *                        forward geocoding & reverse geocoding
- *                        ('mapbox' = Mapbox Geocoding REST API)
- *
- * Why hybrid?
- *   • Google Maps = best map rendering, familiar UX
- *   • Mapbox      = generous free geocoding tier, great autocomplete
+ * Change MAP_PROVIDER to switch between 'mapbox' and 'google'
+ * globally across the entire app. One setting controls everything:
+ *   • Map rendering (interactive maps, static images)
+ *   • Address autocomplete (Places API)
+ *   • Forward & reverse geocoding
  *
  * Keys are picked up from your .env.local file:
  *   VITE_MAPBOX_TOKEN=pk.eyJ1...
  *   VITE_GOOGLE_MAPS_API_KEY=AIza...
  *
  * You can also override the provider per-component by passing
- * `mapProvider` or `geocodeProvider` props explicitly.
+ * { provider: 'google' } explicitly to <MapPicker /> or
+ * <AddressAutocomplete />.
  * ============================================================
  */
 
 export type MapProvider = 'mapbox' | 'google';
 
-/** ✅ Provider used to RENDER interactive maps (Google Maps JS API) */
+/**
+ * ✅ CHANGE THIS to switch the map provider app-wide.
+ *
+ * 'google' → Google Maps JS API  + Google Places + Google Geocoder
+ * 'mapbox' → Mapbox GL JS        + Mapbox Geocoding REST API
+ */
 export const MAP_PROVIDER: MapProvider = 'google';
-
-/** ✅ Provider used for AUTOCOMPLETE, GEOCODING & REVERSE GEOCODING (Mapbox) */
-export const GEOCODE_PROVIDER: MapProvider = 'mapbox';
 
 /** Mapbox public access token */
 export const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined;
 
-/** Google Maps JavaScript API key (must have Maps JS API enabled) */
+/** Google Maps JavaScript API key (must have Maps JS, Places, Geocoding APIs enabled) */
 export const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 
 /**
@@ -52,7 +48,7 @@ export const DEFAULT_ZOOM = 12;
 export const DEFAULT_RADIUS_KM = 5;
 
 /**
- * Returns the API key for the given provider.
+ * Returns the active API key for the given provider.
  * Throws a descriptive error if the key is missing.
  */
 export function getProviderKey(provider: MapProvider): string {
@@ -70,7 +66,9 @@ export function getProviderKey(provider: MapProvider): string {
     throw new Error(
       '[Maps] Missing VITE_GOOGLE_MAPS_API_KEY in .env.local.\n' +
         'Create one at https://console.cloud.google.com/ and enable:\n' +
-        '  • Maps JavaScript API',
+        '  • Maps JavaScript API\n' +
+        '  • Places API\n' +
+        '  • Geocoding API',
     );
   }
   return GOOGLE_MAPS_API_KEY;
