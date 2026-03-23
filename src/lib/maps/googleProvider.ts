@@ -108,7 +108,8 @@ export async function googleAutocomplete(
   return new Promise((resolve, reject) => {
     const request: google.maps.places.AutocompletionRequest = {
       input: query,
-      types: ['geocode'],
+      // No `types` filter — returns all results (addresses, establishments,
+      // landmarks, etc.) just like the Google Maps search bar.
       ...(options.country
         ? { componentRestrictions: { country: options.country } }
         : {}),
