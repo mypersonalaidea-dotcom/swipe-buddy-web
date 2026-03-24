@@ -17,6 +17,7 @@ interface MediaFile {
 
 interface RoomDetails {
   id: string;
+  roomName: string;
   roomType: "private" | "shared" | "studio";
   quantity: string;
   rent: string;
@@ -63,6 +64,9 @@ interface SignupData {
   housingDetails: {
     searchType: "flat" | "flatmate" | "both";
     propertyMoveInDate?: string;
+    searchLocation?: string;
+    searchCoordinates?: [number, number];
+    searchRadius?: number;
     flatDetails: {
       address: string;
       /** [longitude, latitude] — set by AddressAutocomplete */
@@ -200,7 +204,7 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
         );
       }
 
-        // 5. Create flat listing if user has flat details
+      // 5. Create flat listing with rooms + amenities if user has flat details
       const { flatDetails, searchType } = housingDetails;
       if ((searchType === "flatmate" || searchType === "both") && flatDetails.address) {
         const furnishingMap: Record<string, string> = {
@@ -213,16 +217,44 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
         const latitude  = flatDetails.coordinates?.[1];
         const longitude = flatDetails.coordinates?.[0];
 
+        // Build rooms array for nested creation
+        const rooms = flatDetails.rooms
+          .filter(r => r.roomType)
+          .map((r, idx) => ({
+            room_name: r.roomName || undefined,
+            room_type: r.roomType,
+            rent: r.rent ? parseFloat(r.rent) : undefined,
+            security_deposit: r.securityDeposit ? parseFloat(r.securityDeposit) : undefined,
+            brokerage: r.brokerage ? parseFloat(r.brokerage) : undefined,
+            available_count: r.quantity ? parseInt(r.quantity) : 1,
+            available_from: r.availableFrom || undefined,
+            display_order: idx + 1,
+            amenities: r.amenities || [],
+          }));
+
         await api.post("/flats", {
           address: flatDetails.address,
           city: flatDetails.city,
           state: flatDetails.state,
+          flat_type: flatDetails.flatType || undefined,
           furnishing_type: furnishingMap[flatDetails.flatFurnishing] || "unfurnished",
           description: flatDetails.description || undefined,
           is_published: true,
-          // Coordinates — only sent when the user picked an address via autocomplete
           ...(latitude  !== undefined && { latitude }),
           ...(longitude !== undefined && { longitude }),
+          // Nested rooms + amenities
+          rooms: rooms.length > 0 ? rooms : undefined,
+          common_amenities: flatDetails.commonAmenities?.length > 0
+            ? flatDetails.commonAmenities
+            : undefined,
+        });
+      }
+
+      // 6. Save search preferences (location + radius) for flat seekers
+      if ((searchType === "flat" || searchType === "both") && housingDetails.searchLocation) {
+        await api.put("/profile/search-preferences", {
+          location_search: housingDetails.searchLocation,
+          location_range_km: housingDetails.searchRadius ?? 5,
         });
       }
 

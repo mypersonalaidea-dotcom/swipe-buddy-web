@@ -7,7 +7,7 @@ export const mockProfiles: Profile[] = [
     age: 26,
     city: "Mumbai",
     state: "Maharashtra",
-    profilePicture: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop",
+    profilePicture: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop",
     searchType: "flatmate",
     myHabits: ["Non-Smoker", "Vegetarian", "Early Riser", "Clean & Organized"],
     lookingForHabits: ["Non-Smoker", "Respectful", "Quiet", "Working Professional"],

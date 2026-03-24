@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MediaUpload } from "@/components/ui/media-upload";
 import { AddressAutocomplete } from "@/components/map/AddressAutocomplete";
-import { Home, Camera, Plus, Trash2, DoorOpen, Building2, Calendar } from "lucide-react";
+import { MapPicker } from "@/components/map/MapPicker";
+import { Home, Camera, Plus, Trash2, DoorOpen, Building2, Calendar, MapPin } from "lucide-react";
 
 interface MediaFile {
   id: string;
@@ -20,6 +21,7 @@ interface MediaFile {
 
 interface RoomDetails {
   id: string;
+  roomName: string;
   roomType: "private" | "shared" | "studio";
   quantity: string;
   rent: string;
@@ -34,6 +36,10 @@ interface RoomDetails {
 interface HousingDetailsData {
   searchType: "flat" | "flatmate" | "both";
   propertyMoveInDate?: string;
+  // For flat seekers
+  searchLocation?: string;
+  searchCoordinates?: [number, number];
+  searchRadius?: number;
   // For flat owners
   flatDetails: {
     address: string;
@@ -119,6 +125,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
   const addRoom = () => {
     const newRoom: RoomDetails = {
       id: Date.now().toString(),
+      roomName: "",
       roomType: "private",
       quantity: "1",
       rent: "",
@@ -192,7 +199,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
 
   // Custom Validation
   if (data.searchType === "flat" || data.searchType === "both") {
-    isValid = isValid && !!data.propertyMoveInDate;
+    isValid = isValid && !!data.propertyMoveInDate && !!data.searchLocation;
   }
 
   if (data.searchType === "flatmate" || data.searchType === "both") {
@@ -296,6 +303,34 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                 onChange={(e) => onUpdate({ ...data, propertyMoveInDate: e.target.value })}
               />
             </div>
+
+            {/* Preferred Search Area with Map */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                Preferred Search Area <span className="text-red-500">*</span>
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Select the area where you're looking for a flat and adjust the search radius
+              </p>
+              <MapPicker
+                showRadius
+                radius={data.searchRadius ?? 5}
+                location={data.searchLocation}
+                coordinates={data.searchCoordinates}
+                onLocationChange={(result) => {
+                  onUpdate({
+                    ...data,
+                    searchLocation: result.fullAddress,
+                    searchCoordinates: result.coordinates,
+                  });
+                }}
+                onRadiusChange={(r) => {
+                  onUpdate({ ...data, searchRadius: r });
+                }}
+                height="280px"
+              />
+            </div>
           </CardContent>
         </Card>
       )}
@@ -311,12 +346,11 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="flat-address">Flat Address <span className="text-destructive">*</span></Label>
-              <AddressAutocomplete
-                id="flat-address"
-                value={data.flatDetails.address}
-                placeholder="Search for your flat address..."
-                countryCode="in"
-                onSelect={(result) => {
+              {/* Map for pinpointing flat location */}
+              <MapPicker
+                location={data.flatDetails.address}
+                coordinates={data.flatDetails.coordinates}
+                onLocationChange={(result) => {
                   onUpdate({
                     ...data,
                     flatDetails: {
@@ -328,7 +362,7 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                     },
                   });
                 }}
-                onChange={(val) => handleFlatDetailsChange('address', val)}
+                height="240px"
               />
             </div>
 
@@ -426,6 +460,15 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Room Name</Label>
+                      <Input
+                        placeholder="Ex: Private room with Balcony"
+                        value={room.roomName}
+                        onChange={(e) => updateRoom(room.id, 'roomName', e.target.value)}
+                      />
                     </div>
 
                     <div className="space-y-2">
