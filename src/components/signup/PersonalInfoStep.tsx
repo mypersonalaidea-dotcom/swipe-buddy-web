@@ -65,6 +65,10 @@ interface PersonalInfoStepProps {
   onSwitchToLogin?: () => void;
 }
 
+// OTP mode: "hardcoded" accepts 123456 locally, "service" uses backend APIs
+const OTP_MODE = import.meta.env.VITE_OTP_MODE || "hardcoded";
+const HARDCODED_OTP = "123456";
+
 export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: PersonalInfoStepProps) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -347,39 +351,48 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
     setOtpError("");
 
     try {
-      if (otpType === "phone") {
-        // Verify OTP via backend
-        const res = await api.post("/auth/verify-otp", {
-          phone: data.phone,
-          otp: otpValue,
-        });
-
-        if (res.data?.success || res.data?.data?.verified) {
-          handleInputChange('phoneVerified', true);
-          toast({
-            title: "Phone Verified! ✅",
-            description: "Your phone number has been verified successfully.",
-          });
+      if (OTP_MODE === "hardcoded") {
+        // ── Hardcoded mode: verify against 123456 locally ──
+        if (otpValue === HARDCODED_OTP) {
+          if (otpType === "phone") {
+            handleInputChange('phoneVerified', true);
+            toast({ title: "Phone Verified! ✅", description: "Your phone number has been verified successfully." });
+          } else {
+            handleInputChange('emailVerified', true);
+            toast({ title: "Email Verified! ✅", description: "Your email has been verified successfully." });
+          }
           setOtpDialogOpen(false);
         } else {
-          setOtpError(res.data?.message || "Invalid OTP. Please try again.");
+          setOtpError("Invalid OTP. Please try again.");
         }
       } else {
-        // Email OTP verification via backend
-        const res = await api.post("/auth/verify-email-otp", {
-          email: data.email,
-          otp: otpValue,
-        });
-
-        if (res.data?.success || res.data?.data?.verified) {
-          handleInputChange('emailVerified', true);
-          toast({
-            title: "Email Verified! ✅",
-            description: "Your email has been verified successfully.",
+        // ── Service mode: verify via backend APIs ──
+        if (otpType === "phone") {
+          const res = await api.post("/auth/verify-otp", {
+            phone: data.phone,
+            otp: otpValue,
           });
-          setOtpDialogOpen(false);
+
+          if (res.data?.success || res.data?.data?.verified) {
+            handleInputChange('phoneVerified', true);
+            toast({ title: "Phone Verified! ✅", description: "Your phone number has been verified successfully." });
+            setOtpDialogOpen(false);
+          } else {
+            setOtpError(res.data?.message || "Invalid OTP. Please try again.");
+          }
         } else {
-          setOtpError(res.data?.message || "Invalid OTP. Please try again.");
+          const res = await api.post("/auth/verify-email-otp", {
+            email: data.email,
+            otp: otpValue,
+          });
+
+          if (res.data?.success || res.data?.data?.verified) {
+            handleInputChange('emailVerified', true);
+            toast({ title: "Email Verified! ✅", description: "Your email has been verified successfully." });
+            setOtpDialogOpen(false);
+          } else {
+            setOtpError(res.data?.message || "Invalid OTP. Please try again.");
+          }
         }
       }
     } catch (err: any) {
@@ -398,11 +411,20 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
     setOtpValue("");
     setOtpError("");
 
+    if (OTP_MODE === "hardcoded") {
+      // In hardcoded mode, just reset the countdown (no backend call)
+      setOtpCountdown(30);
+      toast({
+        title: "OTP Resent! 🔄",
+        description: `Use code ${HARDCODED_OTP} to verify (dev mode)`,
+      });
+      return;
+    }
+
     try {
       if (otpType === "phone") {
         await api.post("/auth/send-otp", { phone: data.phone });
       } else {
-        // Use check-email endpoint to resend email OTP
         await api.post("/auth/check-email", { email: data.email });
       }
       setOtpCountdown(30);
@@ -433,6 +455,12 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
       return;
     }
 
+    if (OTP_MODE === "hardcoded") {
+      // Skip backend phone-check in hardcoded mode, go straight to OTP dialog
+      openOtpDialog("phone");
+      return;
+    }
+
     setVerifyLoading("phone");
 
     try {
@@ -459,13 +487,18 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
       });
       return;
     }
+
+    if (OTP_MODE === "hardcoded") {
+      // Skip backend email-check in hardcoded mode, go straight to OTP dialog
+      openOtpDialog("email");
+      return;
+    }
+
     setVerifyLoading("email");
 
     try {
-      // Call check-email endpoint to send OTP via Resend
       const res = await api.post("/auth/check-email", { email: data.email });
 
-      // If the email already exists, inform the user
       if (res.data?.data?.exists) {
         toast({
           title: "Email Already Registered",
