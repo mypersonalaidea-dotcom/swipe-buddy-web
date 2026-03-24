@@ -466,9 +466,11 @@ export const HousingDetailsStep = ({ data, onUpdate, onSubmit, onBack, isSubmitt
                       <Label>Room Name</Label>
                       <Input
                         placeholder="Ex: Private room with Balcony"
+                        maxLength={50}
                         value={room.roomName}
                         onChange={(e) => updateRoom(room.id, 'roomName', e.target.value)}
                       />
+                      <p className="text-xs text-muted-foreground text-right">{room.roomName.length}/50</p>
                     </div>
 
                     <div className="space-y-2">
