@@ -1,5 +1,6 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SearchableSelect } from "@/components/ui/searchable-select";
@@ -7,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Upload, User, Users, Phone, PhoneOff, Mail, Calendar, CalendarArrowUp, CalendarArrowDown, UserCheck, GraduationCap, Plus, Trash2, Briefcase, BookOpen, Lock, Eye, EyeOff, ShieldCheck, KeyRound, ZoomIn, ZoomOut, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
@@ -44,7 +47,7 @@ interface EducationExperience {
 
 interface PersonalInfoData {
   name: string;
-  age: string;
+  dob: string;
   gender: string;
   phone: string;
   email: string;
@@ -619,7 +622,8 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
   const areEducationExperiencesValid = data.educationExperiences.length === 0 || data.educationExperiences.every(edu =>
     edu.institution && edu.degree && edu.startYear && edu.endYear
   );
-  const isValid = Boolean(data.name && data.age && data.gender && data.phone && data.phone.length === 10 && data.phoneVerified && isPasswordValid && areJobExperiencesValid && areEducationExperiencesValid);
+  const isDobComplete = /^\d{4}-\d{2}-\d{2}$/.test(data.dob);
+  const isValid = Boolean(data.name && isDobComplete && data.gender && data.phone && data.phone.length === 10 && data.phoneVerified && isPasswordValid && areJobExperiencesValid && areEducationExperiencesValid);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -808,18 +812,135 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="age" className="flex items-center gap-2">
+            <Label htmlFor="dob" className="flex items-center gap-2">
               <Calendar className="w-4 h-4" />
-              Age <span className="text-red-500">*</span>
+              Date of Birth <span className="text-red-500">*</span>
             </Label>
-            <Input
-              id="age"
-              type="number"
-              min="1"
-              placeholder="Ex: 25"
-              value={data.age}
-              onChange={(e) => handleInputChange('age', e.target.value)}
-            />
+            {(() => {
+              // eslint-disable-next-line react-hooks/rules-of-hooks
+              const [dobView, setDobView] = useState<'year' | 'month' | 'day'>('day');
+              // eslint-disable-next-line react-hooks/rules-of-hooks
+              const [dobNavMonth, setDobNavMonth] = useState<Date>(
+                data.dob ? new Date(data.dob) : new Date(new Date().getFullYear() - 25, 0)
+              );
+
+              const currentYear = new Date().getFullYear();
+              const startYear = 1945;
+              const allYears = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i).reverse();
+              const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+              return (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={`w-full justify-start text-left font-normal ${
+                        !data.dob ? 'text-muted-foreground' : ''
+                      }`}
+                    >
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {data.dob
+                        ? format(new Date(data.dob), 'PPP')
+                        : 'Select your date of birth'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    {dobView === 'year' && (
+                      <div className="p-3 w-[280px]">
+                        <div className="text-center font-semibold text-sm mb-3">Select Year</div>
+                        <div className="grid grid-cols-4 gap-1.5 max-h-[240px] overflow-y-auto">
+                          {allYears.map(y => (
+                            <button
+                              key={y}
+                              onClick={() => {
+                                setDobNavMonth(new Date(y, dobNavMonth.getMonth()));
+                                setDobView('month');
+                              }}
+                              className={`text-sm py-1.5 rounded-md transition-colors hover:bg-primary hover:text-primary-foreground ${
+                                dobNavMonth.getFullYear() === y
+                                  ? 'bg-primary text-primary-foreground font-medium'
+                                  : 'hover:bg-accent'
+                              }`}
+                            >
+                              {y}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {dobView === 'month' && (
+                      <div className="p-3 w-[280px]">
+                        <button
+                          onClick={() => setDobView('year')}
+                          className="w-full text-center font-semibold text-sm mb-3 hover:text-primary transition-colors cursor-pointer"
+                        >
+                          {dobNavMonth.getFullYear()} ▾
+                        </button>
+                        <div className="grid grid-cols-3 gap-2">
+                          {monthNames.map((name, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => {
+                                setDobNavMonth(new Date(dobNavMonth.getFullYear(), idx));
+                                setDobView('day');
+                              }}
+                              className={`text-sm py-2.5 rounded-md transition-colors hover:bg-primary hover:text-primary-foreground ${
+                                dobNavMonth.getMonth() === idx
+                                  ? 'bg-primary text-primary-foreground font-medium'
+                                  : 'hover:bg-accent'
+                              }`}
+                            >
+                              {name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {dobView === 'day' && (
+                      <CalendarComponent
+                        mode="single"
+                        month={dobNavMonth}
+                        onMonthChange={setDobNavMonth}
+                        selected={data.dob ? new Date(data.dob) : undefined}
+                        onSelect={(date) => {
+                          if (date) {
+                            const y = date.getFullYear();
+                            const m = String(date.getMonth() + 1).padStart(2, '0');
+                            const d = String(date.getDate()).padStart(2, '0');
+                            handleInputChange('dob', `${y}-${m}-${d}`);
+                          }
+                        }}
+                        disabled={(date) => date > new Date() || date < new Date('1920-01-01')}
+                        initialFocus
+                        className="rounded-md border"
+                        classNames={{
+                          caption_label: 'text-sm font-medium cursor-pointer hover:text-primary hover:underline transition-colors',
+                        }}
+                        onDayClick={() => {}}
+                        formatters={{
+                          formatCaption: (date) => {
+                            return `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+                          },
+                        }}
+                        components={{
+                          CaptionLabel: ({ displayMonth }: { displayMonth: Date }) => (
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setDobView('year');
+                              }}
+                              className="text-sm font-medium cursor-pointer hover:text-primary hover:underline underline-offset-2 transition-colors flex items-center gap-1"
+                            >
+                              {monthNames[displayMonth.getMonth()]} {displayMonth.getFullYear()} ▾
+                            </button>
+                          ),
+                        }}
+                      />
+                    )}
+                  </PopoverContent>
+                </Popover>
+              );
+            })()}
           </div>
           <div className="space-y-2">
             <Label className="flex items-center gap-2">

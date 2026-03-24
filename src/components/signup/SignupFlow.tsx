@@ -49,7 +49,7 @@ interface EducationExperience {
 interface SignupData {
   personalInfo: {
     name: string;
-    age: string;
+    dob: string;
     gender: string;
     phone: string;
     email: string;
@@ -98,7 +98,7 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
   const [signupData, setSignupData] = useState<SignupData>({
     personalInfo: {
       name: "",
-      age: "",
+      dob: "",
       gender: "",
       phone: "",
       email: "",
@@ -152,19 +152,26 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
     setIsSubmitting(true);
 
     try {
+      // Calculate age from DOB
+      const dobDate = new Date(personalInfo.dob);
+      const today = new Date();
+      let age = today.getFullYear() - dobDate.getFullYear();
+      const monthDiff = today.getMonth() - dobDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dobDate.getDate())) age--;
+
       // 1. Create account (with all mandatory fields)
       await signup({
         name: personalInfo.name,
         email: personalInfo.email,
         password: personalInfo.password,
         phone: personalInfo.phone,
-        age: parseInt(personalInfo.age) || 0,
+        age: age || 0,
         gender: personalInfo.gender,
       });
 
       // 2. Update profile with age, gender, city, search_type
       await api.put("/profile", {
-        age: parseInt(personalInfo.age) || undefined,
+        age: age || undefined,
         gender: personalInfo.gender || undefined,
         search_type: housingDetails.searchType,
       });
