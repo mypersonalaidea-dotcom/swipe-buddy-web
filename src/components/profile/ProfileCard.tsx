@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -110,33 +110,62 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
   };
 
   return (
-    <Card className="shadow-card bg-gradient-card">
-      <CardHeader className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <img
-              src={profile.profilePicture}
-              alt={profile.name}
-              className="w-20 h-20 rounded-full object-cover border-4 border-primary/20"
-            />
-            <div>
-              <h2 className="text-3xl font-bold text-foreground">{profile.name}</h2>
-              <p className="text-sm text-muted-foreground">{profile.city}, {profile.state}</p>
-              <p className="text-muted-foreground text-lg">{profile.age} years old</p>
+    <Card className="shadow-card bg-gradient-card overflow-hidden">
+      {/* ── Top Section: Pink gradient header ── */}
+      <div className="bg-gradient-to-b from-rose-100/80 to-background px-6 pt-6 pb-4 space-y-4">
+        {/* Row 1: Avatar + Info + Actions */}
+        <div className="flex items-start justify-between gap-4">
+          {/* Avatar with online indicator */}
+          <div className="flex items-start gap-4">
+            <div className="relative flex-shrink-0">
+              <img
+                src={profile.profilePicture}
+                alt={profile.name}
+                className="w-20 h-20 rounded-full object-cover border-[3px] border-white shadow-md"
+              />
+              <span className="absolute bottom-1 right-0 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white" />
+            </div>
+
+            {/* Name, location, tags */}
+            <div className="min-w-0 space-y-1.5 pt-0.5">
+              <h2 className="text-2xl font-bold text-foreground leading-tight">
+                {profile.name}<span className="font-normal text-muted-foreground">, {profile.age}</span>
+              </h2>
+              <p className="flex items-center gap-1 text-sm text-muted-foreground">
+                <MapPin className="w-3.5 h-3.5 text-rose-500 flex-shrink-0" />
+                {profile.city}, {profile.state}
+              </p>
+              {/* Profession & Education tags */}
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                {profile.jobExperiences.length > 0 && (
+                  <Badge variant="outline" className="text-xs font-normal bg-white/70 border-border/60 gap-1">
+                    <Briefcase className="w-3 h-3" />
+                    {profile.jobExperiences[0].position}
+                  </Badge>
+                )}
+                {profile.educationExperiences.length > 0 && (
+                  <Badge variant="outline" className="text-xs font-normal bg-white/70 border-border/60 gap-1">
+                    <GraduationCap className="w-3 h-3" />
+                    {profile.educationExperiences[0].institution}
+                  </Badge>
+                )}
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+
+          {/* Right side: bookmark, menu, badge */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             <Button
-              variant={saved ? "default" : "outline"}
+              variant="ghost"
               size="icon"
               onClick={handleSaveProfile}
-              className="h-10 w-10"
+              className="h-9 w-9 rounded-full hover:bg-white/60"
             >
-              <Bookmark className={`h-5 w-5 ${saved ? "fill-current" : ""}`} />
+              <Bookmark className={`h-5 w-5 ${saved ? "fill-primary text-primary" : "text-muted-foreground"}`} />
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-muted">
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-white/60">
                   <MoreVertical className="h-5 w-5 text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
@@ -151,36 +180,41 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Badge variant={isLookingForFlatmate ? "default" : "secondary"} className="h-8 px-4">
+            <Badge
+              className={`h-7 px-3 text-xs font-semibold rounded-full border-0 ${
+                isLookingForFlatmate
+                  ? "bg-rose-600 text-white hover:bg-rose-700"
+                  : "bg-blue-600 text-white hover:bg-blue-700"
+              }`}
+            >
               {isLookingForFlatmate ? "Has Flat" : "Looking for Flat"}
             </Badge>
           </div>
         </div>
 
-        {/* Message Box */}
-        <div className="space-y-2">
-          {hasExistingConversation ? (
-            <div className="bg-muted/50 border border-border rounded-lg p-4 text-center">
-              <p className="text-muted-foreground">
-                You are in conversation with <span className="font-semibold text-foreground">{profile.name}</span>
-              </p>
-            </div>
-          ) : (
-            <>
-              <Textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                className="min-h-[80px] resize-none"
-                placeholder="Type your message..."
-              />
-              <Button onClick={handleSendMessage} className="w-full" size="lg">
-                <Send className="mr-2 h-4 w-4" />
-                Send Message
-              </Button>
-            </>
-          )}
-        </div>
-      </CardHeader>
+        {/* Row 2: Conversation bar or Message box */}
+        {hasExistingConversation ? (
+          <div className="bg-gradient-to-r from-rose-50 to-rose-100/60 rounded-lg px-4 py-2.5 flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-orange-400 flex-shrink-0" />
+            <p className="text-sm text-foreground/80">
+              In conversation with <span className="font-semibold text-foreground">{profile.name}</span>
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              className="min-h-[80px] resize-none bg-white/70 border-border/40"
+              placeholder="Type your message..."
+            />
+            <Button onClick={handleSendMessage} className="w-full" size="lg">
+              <Send className="mr-2 h-4 w-4" />
+              Send Message
+            </Button>
+          </div>
+        )}
+      </div>
 
       <Separator />
 
