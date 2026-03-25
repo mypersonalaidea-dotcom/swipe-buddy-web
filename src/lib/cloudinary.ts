@@ -27,8 +27,9 @@ export async function uploadToCloudinary(
   folder = "swipe-buddy"
 ): Promise<CloudinaryUploadResult> {
   if (!CLOUD_NAME || !UPLOAD_PRESET) {
+    console.error("Cloudinary Configuration Error:", { cloudName: CLOUD_NAME, uploadPreset: UPLOAD_PRESET });
     throw new Error(
-      "Cloudinary is not configured. Set VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET in .env.local"
+      "Cloudinary is not configured correctly. Check VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET in your environment settings (like Vercel dashboard)."
     );
   }
 
@@ -37,6 +38,8 @@ export async function uploadToCloudinary(
   formData.append("upload_preset", UPLOAD_PRESET);
   formData.append("folder", folder);
 
+  console.log(`Uploading to Cloudinary [Cloud: ${CLOUD_NAME}, Preset: ${UPLOAD_PRESET}]...`);
+
   const res = await fetch(
     `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`,
     { method: "POST", body: formData }
@@ -44,6 +47,18 @@ export async function uploadToCloudinary(
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
+    console.error("Cloudinary request failed:", {
+      status: res.status,
+      statusText: res.statusText,
+      errorData: err,
+      debug: { cloudName: CLOUD_NAME, uploadPreset: UPLOAD_PRESET }
+    });
+    
+    // Provide a very clear error message for common issues
+    if (err?.error?.message?.includes("Upload preset not found")) {
+      throw new Error(`Cloudinary error: Preset '${UPLOAD_PRESET}' not found for Cloud '${CLOUD_NAME}'. Verify these names match your Cloudinary dashboard exactly!`);
+    }
+
     throw new Error(err?.error?.message || `Cloudinary upload failed (${res.status})`);
   }
 
