@@ -6,8 +6,8 @@
  *   VITE_CLOUDINARY_UPLOAD_PRESET – an *unsigned* upload preset configured in Cloudinary dashboard
  */
 
-const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string;
-const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET as string;
+const CLOUD_NAME = (import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string)?.trim();
+const UPLOAD_PRESET = (import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET as string)?.trim();
 
 export interface CloudinaryUploadResult {
   secure_url: string;
