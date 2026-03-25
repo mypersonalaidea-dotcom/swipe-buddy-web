@@ -23,6 +23,7 @@ export interface Flat {
   latitude?: string | null;
   longitude?: string | null;
   furnishing_type: string;
+  flat_type?: string | null;
   description?: string;
   is_published: boolean;
   user: { id: string; name: string; profile_picture_url: string | null };

@@ -166,7 +166,7 @@ export const ProfilePage = () => {
     const flatDetails = apiFlat
       ? {
           address: apiFlat.address ?? "",
-          flatType: (apiFlat as any).flat_type ?? "",
+          flatType: apiFlat.flat_type ?? "",
           flatFurnishing: furnishingReverseMap[apiFlat.furnishing_type] ?? "",
           rooms: (apiFlat.rooms ?? []).map((r) => ({
             id: r.id,

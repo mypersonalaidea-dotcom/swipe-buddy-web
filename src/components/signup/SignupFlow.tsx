@@ -170,17 +170,6 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
     return results;
   };
 
-  /**
-   * Parse a security_deposit / brokerage string like "2 Month", "15 Day",
-   * or "none|2 Month" → returns null when "none|" prefixed, else the raw
-   * string (which is what the backend expects).
-   */
-  const parseDepositOrBrokerage = (value: string | undefined): string | null => {
-    if (!value) return null;
-    if (value.startsWith("none|")) return null; // user opted out
-    return value; // e.g. "2 Month"
-  };
-
   const handleSubmit = async () => {
     const { personalInfo, housingDetails } = signupData;
     setIsSubmitting(true);
@@ -327,12 +316,12 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
                 room_name: r.roomName || undefined,
                 room_type: r.roomType,
                 rent: r.rent ? parseFloat(r.rent) : undefined,
-                security_deposit: parseDepositOrBrokerage(r.securityDeposit),
-                brokerage: parseDepositOrBrokerage(r.brokerage),
+                security_deposit: r.securityDeposit && !r.securityDeposit.startsWith('none|') ? parseInt(r.securityDeposit.replace('none|', '').split(' ')[0] || '0') : undefined,
+                brokerage: r.brokerage && !r.brokerage.startsWith('none|') ? parseInt(r.brokerage.replace('none|', '').split(' ')[0] || '0') : undefined,
                 available_count: r.quantity ? parseInt(r.quantity) : 1,
                 available_from: r.availableFrom || undefined,
                 display_order: idx + 1,
-                amenities: r.amenities || [],
+                room_amenities: r.amenities || [],
                 media: roomMediaUploaded.length > 0 ? roomMediaUploaded : undefined,
               };
             })
