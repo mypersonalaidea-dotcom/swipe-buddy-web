@@ -105,9 +105,8 @@ export function MapboxMapRenderer({
       .setLngLat(center)
       .addTo(map);
 
-    marker.on('dragend', async () => {
-      const lngLat = marker.getLngLat();
-      const coords: LngLat = [lngLat.lng, lngLat.lat];
+    // Reverse-geocode helper for both drag and click
+    const handleMarkerMoved = async (coords: LngLat) => {
       currentCenterRef.current = coords;
       try {
         const result = await reverseGeocodeCoords(coords);
@@ -118,10 +117,24 @@ export function MapboxMapRenderer({
       } catch (err) {
         console.error('[MapboxRenderer] Reverse geocode error:', err);
       }
+    };
+
+    marker.on('dragend', () => {
+      const lngLat = marker.getLngLat();
+      handleMarkerMoved([lngLat.lng, lngLat.lat]);
+    });
+
+    // Click anywhere on map → move pin there
+    map.on('click', (e) => {
+      const coords: LngLat = [e.lngLat.lng, e.lngLat.lat];
+      marker.setLngLat(coords);
+      handleMarkerMoved(coords);
     });
 
     map.on('load', () => {
       updateCircle(map, center, currentRadiusRef.current);
+      // Set crosshair cursor to hint click-to-place
+      map.getCanvas().style.cursor = 'crosshair';
     });
 
     map.on('error', (e) => {

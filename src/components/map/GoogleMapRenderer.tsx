@@ -51,6 +51,7 @@ export function GoogleMapRenderer({
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: true,
+        draggableCursor: 'crosshair',
         styles: [{ featureType: 'poi', stylers: [{ visibility: 'simplified' }] }],
       });
 
@@ -58,20 +59,12 @@ export function GoogleMapRenderer({
         position: latLng,
         map,
         draggable: true,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 10,
-          fillColor: '#6366f1',
-          fillOpacity: 1,
-          strokeColor: '#ffffff',
-          strokeWeight: 2,
-        },
+        animation: google.maps.Animation.DROP,
+        title: 'Drag me to set location',
       });
 
-      marker.addListener('dragend', async () => {
-        const pos = marker.getPosition();
-        if (!pos) return;
-        const coords: LngLat = [pos.lng(), pos.lat()];
+      // Reverse-geocode helper for both drag and click
+      const handleMarkerMoved = async (coords: LngLat) => {
         try {
           const result = await reverseGeocodeCoords(coords);
           onMarkerDragEnd?.(result);
@@ -79,6 +72,21 @@ export function GoogleMapRenderer({
         } catch (err) {
           console.error('[GoogleMapRenderer] Reverse geocode error:', err);
         }
+      };
+
+      marker.addListener('dragend', () => {
+        const pos = marker.getPosition();
+        if (!pos) return;
+        handleMarkerMoved([pos.lng(), pos.lat()]);
+      });
+
+      // Click anywhere on map → move pin there
+      map.addListener('click', (e: google.maps.MapMouseEvent) => {
+        if (!e.latLng) return;
+        const coords: LngLat = [e.latLng.lng(), e.latLng.lat()];
+        marker.setPosition(e.latLng);
+        marker.setAnimation(google.maps.Animation.DROP);
+        handleMarkerMoved(coords);
       });
 
       mapRef.current = map;

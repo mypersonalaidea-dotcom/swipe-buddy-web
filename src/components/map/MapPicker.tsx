@@ -151,6 +151,12 @@ export function MapPicker({
         </div>
       </div>
 
+      {/* Drag / click hint */}
+      <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1.5">
+        <MapPin className="w-3 h-3 inline" />
+        Drag the pin or click anywhere on the map to set location
+      </p>
+
       {/* ── Radius slider ─────────────────────────────────────── */}
       {showRadius && (
         <div className="space-y-2 px-1">
