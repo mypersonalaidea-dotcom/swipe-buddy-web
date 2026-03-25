@@ -7,6 +7,7 @@ import { CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/lib/api";
+import { uploadToCloudinary } from "@/lib/cloudinary";
 
 interface MediaFile {
   id: string;
@@ -148,6 +149,25 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
     setIsSubmitting(true);
 
     try {
+      // 0. Upload profile picture to Cloudinary (if provided)
+      let profilePictureUrl: string | undefined;
+      if (personalInfo.profilePicture) {
+        try {
+          const uploadResult = await uploadToCloudinary(
+            personalInfo.profilePicture,
+            "swipe-buddy/profile-pictures"
+          );
+          profilePictureUrl = uploadResult.secure_url;
+        } catch (uploadErr: any) {
+          console.error("Profile picture upload failed:", uploadErr);
+          toast({
+            title: "Image Upload Failed",
+            description: uploadErr?.message || "Could not upload profile picture. Continuing without it.",
+            variant: "destructive",
+          });
+        }
+      }
+
       // 1. Create account (with all mandatory fields)
       await signup({
         name: personalInfo.name,
@@ -158,11 +178,21 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
         gender: personalInfo.gender,
       });
 
-      // 2. Update profile with age, gender, city, search_type
+      // Derive city/state from flat details if available
+      const { flatDetails, searchType } = housingDetails;
+      const userCity = flatDetails.city || undefined;
+      const userState = flatDetails.state || undefined;
+
+      // 2. Update profile with all additional fields
       await api.put("/profile", {
         age: parseInt(personalInfo.age) || undefined,
         gender: personalInfo.gender || undefined,
         search_type: housingDetails.searchType,
+        phone_verified: personalInfo.phoneVerified,
+        email_verified: personalInfo.emailVerified,
+        city: userCity,
+        state: userState,
+        ...(profilePictureUrl && { profile_picture_url: profilePictureUrl }),
       });
 
       // 3. Add job experiences (parallel)
@@ -201,7 +231,6 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
       }
 
         // 5. Create flat listing if user has flat details
-      const { flatDetails, searchType } = housingDetails;
       if ((searchType === "flatmate" || searchType === "both") && flatDetails.address) {
         const furnishingMap: Record<string, string> = {
           "fully-furnished": "furnished",
