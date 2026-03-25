@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { MapPin, Briefcase, GraduationCap, Home, Send, Bookmark, MoreVertical, Flag, ShieldOff, ExternalLink } from "lucide-react";
+import { MapPin, Briefcase, GraduationCap, Home, Send, Bookmark, MoreVertical, Flag, ShieldOff, ExternalLink, ChevronDown, ChevronUp, DoorOpen, Calendar, IndianRupee } from "lucide-react";
 import { MAPBOX_TOKEN, GOOGLE_MAPS_API_KEY, MAP_PROVIDER } from "@/lib/maps/config";
 import { getHabitIcon } from "@/constants/habits";
 import { useState } from "react";
@@ -82,6 +82,7 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
   const isLookingForFlatmate = profile.searchType === "flatmate";
   const { toast } = useToast();
   const [saved, setSaved] = useState(isSaved);
+  const [expandedRooms, setExpandedRooms] = useState<Set<string>>(new Set());
 
   // Check if already in conversation (either passed as prop or from mock data)
   const hasExistingConversation = alreadyInConversation ?? conversationProfileIds.includes(profile.id);
@@ -111,109 +112,111 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
 
   return (
     <Card className="shadow-card bg-gradient-card overflow-hidden">
-      {/* ── Top Section: Pink gradient header ── */}
-      <div className="bg-gradient-to-b from-rose-100/80 to-background px-6 pt-6 pb-4 space-y-4">
-        {/* Row 1: Avatar + Info + Actions */}
-        <div className="flex items-start justify-between gap-4">
-          {/* Avatar with online indicator */}
-          <div className="flex items-start gap-4">
-            <div className="relative flex-shrink-0">
-              <img
-                src={profile.profilePicture}
-                alt={profile.name}
-                className="w-20 h-20 rounded-full object-cover border-[3px] border-white shadow-md"
-              />
-              <span className="absolute bottom-1 right-0 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white" />
-            </div>
+      {/* ── Top Section: Pink gradient header — two-column layout ── */}
+      <div className="bg-gradient-to-b from-rose-100/80 to-background">
+        <div className="flex p-4 gap-4">
+          {/* Left: Large profile image */}
+          <div className="relative flex-shrink-0 w-36 sm:w-44">
+            <img
+              src={profile.profilePicture}
+              alt={profile.name}
+              className="w-full h-full object-cover rounded-2xl border-2 border-white/80 shadow-md"
+            />
+            <span className="absolute bottom-2 right-2 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white" />
+          </div>
 
-            {/* Name, location, tags */}
-            <div className="min-w-0 space-y-1.5 pt-0.5">
-              <h2 className="text-2xl font-bold text-foreground leading-tight">
-                {profile.name}<span className="font-normal text-muted-foreground">, {profile.age}</span>
-              </h2>
-              <p className="flex items-center gap-1 text-sm text-muted-foreground">
-                <MapPin className="w-3.5 h-3.5 text-rose-500 flex-shrink-0" />
-                {profile.city}, {profile.state}
-              </p>
-              {/* Profession & Education tags */}
-              <div className="flex flex-wrap gap-1.5 pt-0.5">
-                {profile.jobExperiences.length > 0 && (
-                  <Badge variant="outline" className="text-xs font-normal bg-white/70 border-border/60 gap-1">
-                    <Briefcase className="w-3 h-3" />
-                    {profile.jobExperiences[0].position}
-                  </Badge>
-                )}
-                {profile.educationExperiences.length > 0 && (
-                  <Badge variant="outline" className="text-xs font-normal bg-white/70 border-border/60 gap-1">
-                    <GraduationCap className="w-3 h-3" />
-                    {profile.educationExperiences[0].institution}
-                  </Badge>
-                )}
+          {/* Right: Info + Actions + Message */}
+          <div className="flex-1 min-w-0 space-y-3">
+            {/* Name + Actions row */}
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 space-y-1">
+                <h2 className="text-2xl font-bold text-foreground leading-tight">
+                  {profile.name}<span className="font-normal text-muted-foreground">, {profile.age}</span>
+                </h2>
+                <p className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <MapPin className="w-3.5 h-3.5 text-rose-500 flex-shrink-0" />
+                  {profile.city}, {profile.state}
+                </p>
+                {/* Profession & Education tags */}
+                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                  {profile.jobExperiences.length > 0 && (
+                    <Badge variant="outline" className="text-xs font-normal bg-white/70 border-border/60 gap-1">
+                      <Briefcase className="w-3 h-3" />
+                      {profile.jobExperiences[0].position}
+                    </Badge>
+                  )}
+                  {profile.educationExperiences.length > 0 && (
+                    <Badge variant="outline" className="text-xs font-normal bg-white/70 border-border/60 gap-1">
+                      <GraduationCap className="w-3 h-3" />
+                      {profile.educationExperiences[0].institution}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              {/* Actions: bookmark, menu, badge */}
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleSaveProfile}
+                  className="h-8 w-8 rounded-full hover:bg-white/60"
+                >
+                  <Bookmark className={`h-4 w-4 ${saved ? "fill-primary text-primary" : "text-muted-foreground"}`} />
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-white/60">
+                      <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="rounded-xl shadow-lg border-border/50">
+                    <DropdownMenuItem className="rounded-lg cursor-pointer text-destructive focus:text-destructive">
+                      <Flag className="h-4 w-4 mr-2" />
+                      Report User
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="rounded-lg cursor-pointer text-destructive focus:text-destructive">
+                      <ShieldOff className="h-4 w-4 mr-2" />
+                      Block User
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Badge
+                  className={`h-7 px-3 text-xs font-semibold rounded-full border-0 ${
+                    isLookingForFlatmate
+                      ? "bg-rose-600 text-white hover:bg-rose-700"
+                      : "bg-blue-600 text-white hover:bg-blue-700"
+                  }`}
+                >
+                  {isLookingForFlatmate ? "Has Flat" : "Looking for Flat"}
+                </Badge>
               </div>
             </div>
-          </div>
 
-          {/* Right side: bookmark, menu, badge */}
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleSaveProfile}
-              className="h-9 w-9 rounded-full hover:bg-white/60"
-            >
-              <Bookmark className={`h-5 w-5 ${saved ? "fill-primary text-primary" : "text-muted-foreground"}`} />
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-white/60">
-                  <MoreVertical className="h-5 w-5 text-muted-foreground" />
+            {/* Conversation bar or Message box */}
+            {hasExistingConversation ? (
+              <div className="bg-gradient-to-r from-rose-50 to-rose-100/60 rounded-lg px-4 py-2.5 flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-orange-400 flex-shrink-0" />
+                <p className="text-sm text-foreground/80">
+                  In conversation with <span className="font-semibold text-foreground">{profile.name}</span>
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  className="min-h-[70px] resize-none bg-white/70 border-border/40 text-sm"
+                  placeholder="Type your message..."
+                />
+                <Button onClick={handleSendMessage} className="w-full" size="sm">
+                  <Send className="mr-2 h-3.5 w-3.5" />
+                  Send Message
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="rounded-xl shadow-lg border-border/50">
-                <DropdownMenuItem className="rounded-lg cursor-pointer text-destructive focus:text-destructive">
-                  <Flag className="h-4 w-4 mr-2" />
-                  Report User
-                </DropdownMenuItem>
-                <DropdownMenuItem className="rounded-lg cursor-pointer text-destructive focus:text-destructive">
-                  <ShieldOff className="h-4 w-4 mr-2" />
-                  Block User
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Badge
-              className={`h-7 px-3 text-xs font-semibold rounded-full border-0 ${
-                isLookingForFlatmate
-                  ? "bg-rose-600 text-white hover:bg-rose-700"
-                  : "bg-blue-600 text-white hover:bg-blue-700"
-              }`}
-            >
-              {isLookingForFlatmate ? "Has Flat" : "Looking for Flat"}
-            </Badge>
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Row 2: Conversation bar or Message box */}
-        {hasExistingConversation ? (
-          <div className="bg-gradient-to-r from-rose-50 to-rose-100/60 rounded-lg px-4 py-2.5 flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-orange-400 flex-shrink-0" />
-            <p className="text-sm text-foreground/80">
-              In conversation with <span className="font-semibold text-foreground">{profile.name}</span>
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <Textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              className="min-h-[80px] resize-none bg-white/70 border-border/40"
-              placeholder="Type your message..."
-            />
-            <Button onClick={handleSendMessage} className="w-full" size="lg">
-              <Send className="mr-2 h-4 w-4" />
-              Send Message
-            </Button>
-          </div>
-        )}
       </div>
 
       <Separator />
@@ -305,66 +308,147 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
               </div>
             </div>
 
-            {/* Rooms Available */}
+            {/* Available Rooms */}
             <div className="space-y-3">
-              <h4 className="font-semibold text-foreground">Available Rooms</h4>
-              {profile.flatDetails.rooms.map((room) => (
-                <div key={room.id} className="border rounded-lg p-4 space-y-3 bg-muted/30">
-                  <div className="flex items-start justify-between">
-                    <h5 className="font-semibold text-foreground">{room.type}</h5>
-                    <Badge variant="default">{room.available} Available</Badge>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <span className="font-medium text-foreground">Rent:</span>
-                      <p className="text-muted-foreground">{room.rent}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-foreground">Security Deposit:</span>
-                      <p className="text-muted-foreground">{room.securityDeposit}</p>
-                    </div>
-                    {room.brokerage && (
-                      <div>
-                        <span className="font-medium text-foreground">Brokerage:</span>
-                        <p className="text-muted-foreground">{room.brokerage}</p>
+              <h3 className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2 text-foreground">
+                <DoorOpen className="h-4 w-4 text-rose-500" />
+                Available Rooms
+              </h3>
+              {profile.flatDetails.rooms.map((room) => {
+                const isExpanded = expandedRooms.has(room.id);
+                return (
+                  <div key={room.id} className="border rounded-xl overflow-hidden bg-background transition-shadow hover:shadow-md">
+                    {/* Collapsed header — always visible */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExpandedRooms(prev => {
+                          const next = new Set(prev);
+                          next.has(room.id) ? next.delete(room.id) : next.add(room.id);
+                          return next;
+                        });
+                      }}
+                      className="w-full flex items-center gap-3 p-3 text-left hover:bg-muted/40 transition-colors"
+                    >
+                      {/* Thumbnail */}
+                      <div className="w-14 h-14 rounded-lg bg-muted flex-shrink-0 overflow-hidden">
+                        {room.photos[0] ? (
+                          <img src={room.photos[0]} alt={room.type} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Home className="w-5 h-5 text-muted-foreground/40" />
+                          </div>
+                        )}
                       </div>
-                    )}
-                    <div>
-                      <span className="font-medium text-foreground">Available From:</span>
-                      <p className="text-muted-foreground">{room.availableFrom}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-foreground">Furnishing Type:</span>
-                      <p className="text-muted-foreground">{room.furnishingType}</p>
-                    </div>
-                  </div>
+                      {/* Title & rent */}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-foreground">{room.type}</p>
+                        <p className="text-sm text-muted-foreground">{room.rent} · {room.available} available</p>
+                      </div>
+                      {/* Badge + Chevron */}
+                      <Badge variant="outline" className="border-rose-200 text-rose-600 bg-rose-50 font-medium text-xs px-2.5 py-1 rounded-full flex-shrink-0">
+                        {room.available} Available
+                      </Badge>
+                      {isExpanded ? (
+                        <ChevronUp className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                      ) : (
+                        <ChevronDown className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                      )}
+                    </button>
 
-                  {/* Room Amenities */}
-                  <div className="space-y-2">
-                    <h6 className="text-sm font-medium text-foreground">Room Amenities</h6>
-                    <div className="flex flex-wrap gap-2">
-                      {room.amenities.map((amenity) => (
-                        <Badge key={amenity} variant="outline" className="text-xs">
-                          {amenity}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
+                    {/* Expanded content */}
+                    <div
+                      className="grid transition-all duration-300 ease-in-out"
+                      style={{
+                        gridTemplateRows: isExpanded ? '1fr' : '0fr',
+                      }}
+                    >
+                      <div className="overflow-hidden">
+                        <div className="border-t border-border">
+                          {/* Two-column: large photo + details */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2">
+                            {/* Large photo */}
+                            <div className="aspect-[4/3] bg-muted">
+                              {room.photos[0] ? (
+                                <img src={room.photos[0]} alt={room.type} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Home className="w-10 h-10 text-muted-foreground/30" />
+                                </div>
+                              )}
+                            </div>
 
-                  {/* Room Photos */}
-                  {room.photos.length > 0 && (
-                    <div className="space-y-2">
-                      <h6 className="text-sm font-medium text-foreground">Room Photos</h6>
-                      <div className="grid grid-cols-3 gap-2">
-                        {room.photos.map((photo, idx) => (
-                          <div key={idx} className="bg-muted aspect-video rounded-lg" />
-                        ))}
+                            {/* Details */}
+                            <div className="p-4 space-y-4">
+                              <div>
+                                <h4 className="text-lg font-bold text-foreground">{room.type}</h4>
+                                <p className="text-sm text-muted-foreground">{room.available} units available</p>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                                <div>
+                                  <p className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                                    <IndianRupee className="w-3 h-3" /> Rent
+                                  </p>
+                                  <p className="font-semibold text-foreground">{room.rent}</p>
+                                </div>
+                                <div>
+                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Deposit</p>
+                                  <p className="font-semibold text-foreground">{room.securityDeposit}</p>
+                                </div>
+                                {room.brokerage && (
+                                  <div>
+                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Brokerage</p>
+                                    <p className="font-semibold text-foreground">{room.brokerage}</p>
+                                  </div>
+                                )}
+                                <div>
+                                  <p className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                                    <Calendar className="w-3 h-3" /> Available From
+                                  </p>
+                                  <p className="font-semibold text-foreground">{room.availableFrom}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Room Amenities */}
+                          <div className="px-4 pb-3 space-y-2">
+                            <h6 className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Room Amenities</h6>
+                            <div className="flex flex-wrap gap-1.5">
+                              {room.amenities.map((amenity) => (
+                                <Badge key={amenity} variant="outline" className="text-xs font-normal rounded-full">
+                                  {amenity}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Room Photos */}
+                          {room.photos.length > 0 && (
+                            <div className="px-4 pb-4 space-y-2">
+                              <h6 className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Room Photos</h6>
+                              <div className="flex gap-2 overflow-x-auto pb-1">
+                                {room.photos.map((photo, idx) => (
+                                  <div key={idx} className="w-20 h-20 rounded-lg bg-muted flex-shrink-0 overflow-hidden">
+                                    {photo ? (
+                                      <img src={photo} alt={`${room.type} ${idx + 1}`} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center">
+                                        <Home className="w-5 h-5 text-muted-foreground/30" />
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  )}
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
 
             {/* Common Amenities & Photos */}

@@ -1,5 +1,6 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SearchableSelect } from "@/components/ui/searchable-select";
@@ -7,7 +8,9 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Upload, User, Users, Phone, PhoneOff, Mail, Calendar, CalendarArrowUp, CalendarArrowDown, UserCheck, GraduationCap, Plus, Trash2, Briefcase, BookOpen, Lock, Eye, EyeOff, ShieldCheck, KeyRound } from "lucide-react";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Upload, User, Users, Phone, PhoneOff, Mail, Calendar, CalendarArrowUp, CalendarArrowDown, UserCheck, GraduationCap, Plus, Trash2, Briefcase, BookOpen, Lock, Eye, EyeOff, ShieldCheck, KeyRound, ZoomIn, ZoomOut, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
 import { BrandMultiSelect, BrandOption } from "@/components/ui/brand-multi-select";
@@ -44,7 +47,7 @@ interface EducationExperience {
 
 interface PersonalInfoData {
   name: string;
-  age: string;
+  dob: string;
   gender: string;
   phone: string;
   email: string;
@@ -187,14 +190,95 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
   // Generate future years array (current year to 10 years ahead)
   const futureYears = Array.from({ length: 11 }, (_, i) => (currentYear + i).toString());
 
+  // Crop dialog state
+  const [cropDialogOpen, setCropDialogOpen] = useState(false);
+  const [rawImageUrl, setRawImageUrl] = useState<string | null>(null);
+  const [cropZoom, setCropZoom] = useState(1);
+  const [cropOffset, setCropOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const cropCanvasRef = useRef<HTMLCanvasElement>(null);
+  const cropImgRef = useRef<HTMLImageElement | null>(null);
+  const cropContainerRef = useRef<HTMLDivElement>(null);
+  const pendingFileRef = useRef<File | null>(null);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      onUpdate({ ...data, profilePicture: file });
+      pendingFileRef.current = file;
       const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
+      setRawImageUrl(url);
+      setCropZoom(1);
+      setCropOffset({ x: 0, y: 0 });
+      setCropDialogOpen(true);
     }
+    // Reset input so re-selecting same file triggers change
+    e.target.value = '';
   };
+
+  const handleCropConfirm = useCallback(() => {
+    if (!rawImageUrl || !cropImgRef.current) return;
+
+    const img = cropImgRef.current;
+    const canvas = document.createElement('canvas');
+    const size = 400; // output size
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+
+    // Fill with white background to avoid black bars
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size, size);
+
+    // Calculate crop area based on zoom and offset
+    const containerSize = 280;
+    const scale = Math.min(containerSize / img.naturalWidth, containerSize / img.naturalHeight) * cropZoom;
+    const drawW = img.naturalWidth * scale;
+    const drawH = img.naturalHeight * scale;
+    const drawX = (containerSize - drawW) / 2 + cropOffset.x;
+    const drawY = (containerSize - drawH) / 2 + cropOffset.y;
+
+    // The visible crop area in the container 
+    const cropAreaSize = 220; // matches the highlight box
+    const cropAreaLeft = (containerSize - cropAreaSize) / 2;
+    const cropAreaTop = (containerSize - cropAreaSize) / 2;
+
+    // Map crop area back to source image
+    const srcX = (cropAreaLeft - drawX) / scale;
+    const srcY = (cropAreaTop - drawY) / scale;
+    const srcSize = cropAreaSize / scale;
+
+    ctx.drawImage(img, srcX, srcY, srcSize, srcSize, 0, 0, size, size);
+
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const croppedFile = new File([blob], pendingFileRef.current?.name || 'profile.jpg', { type: 'image/jpeg' });
+        onUpdate({ ...data, profilePicture: croppedFile });
+        const url = URL.createObjectURL(blob);
+        setPreviewUrl(url);
+      }
+      setCropDialogOpen(false);
+      setRawImageUrl(null);
+    }, 'image/jpeg', 0.9);
+  }, [rawImageUrl, cropZoom, cropOffset, data, onUpdate]);
+
+  const handleRemoveProfilePicture = () => {
+    onUpdate({ ...data, profilePicture: null });
+    setPreviewUrl(null);
+  };
+
+  // Mouse/touch handlers for dragging in crop dialog
+  const handleCropMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - cropOffset.x, y: e.clientY - cropOffset.y });
+  };
+
+  const handleCropMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging) return;
+    setCropOffset({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
+  }, [isDragging, dragStart]);
+
+  const handleCropMouseUp = () => setIsDragging(false);
 
   const handleInputChange = (field: keyof PersonalInfoData, value: string | boolean) => {
     onUpdate({ ...data, [field]: value });
@@ -538,7 +622,8 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
   const areEducationExperiencesValid = data.educationExperiences.length === 0 || data.educationExperiences.every(edu =>
     edu.institution && edu.degree && edu.startYear && edu.endYear
   );
-  const isValid = Boolean(data.name && data.age && data.gender && data.phone && data.phone.length === 10 && data.phoneVerified && isPasswordValid && areJobExperiencesValid && areEducationExperiencesValid);
+  const isDobComplete = /^\d{4}-\d{2}-\d{2}$/.test(data.dob);
+  const isValid = Boolean(data.name && isDobComplete && data.gender && data.phone && data.phone.length === 10 && data.phoneVerified && isPasswordValid && areJobExperiencesValid && areEducationExperiencesValid);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -550,16 +635,35 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
       {/* Profile Picture Upload */}
       <div className="flex flex-col items-center space-y-4">
         <div className="relative">
-          <div className="w-24 h-24 rounded-full border-2 border-dashed border-border flex items-center justify-center overflow-hidden bg-accent/30">
+          <div
+            className={`w-36 h-36 rounded-2xl border-2 border-dashed border-border flex items-center justify-center overflow-hidden bg-accent/30 shadow-md ${previewUrl ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''}`}
+            onClick={() => {
+              if (previewUrl) {
+                setRawImageUrl(previewUrl);
+                setCropZoom(1);
+                setCropOffset({ x: 0, y: 0 });
+                setCropDialogOpen(true);
+              }
+            }}
+          >
             {previewUrl ? (
               <img src={previewUrl} alt="Profile" className="w-full h-full object-cover" />
             ) : (
-              <User className="w-8 h-8 text-muted-foreground" />
+              <User className="w-10 h-10 text-muted-foreground" />
             )}
           </div>
           <label htmlFor="profile-picture" className="absolute -bottom-2 -right-2 bg-primary rounded-full p-2 cursor-pointer hover:bg-primary/90 transition-colors">
             <Upload className="w-4 h-4 text-primary-foreground" />
           </label>
+          {previewUrl && (
+            <button
+              type="button"
+              onClick={handleRemoveProfilePicture}
+              className="absolute -top-2 -right-2 bg-destructive rounded-full p-1.5 cursor-pointer hover:bg-destructive/90 transition-colors"
+            >
+              <X className="w-3 h-3 text-white" />
+            </button>
+          )}
           <input
             id="profile-picture"
             type="file"
@@ -570,6 +674,126 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
         </div>
         <p className="text-sm text-muted-foreground">Upload your profile picture</p>
       </div>
+
+      {/* Crop Dialog */}
+      <Dialog open={cropDialogOpen} onOpenChange={(open) => { if (!open) { setCropDialogOpen(false); setRawImageUrl(null); } }}>
+        <DialogContent className="max-w-[380px] mx-auto p-0 overflow-hidden">
+          <DialogHeader className="p-4 pb-2">
+            <DialogTitle className="text-center">Crop Profile Picture</DialogTitle>
+            <DialogDescription className="text-center text-sm">Drag to reposition, zoom to adjust</DialogDescription>
+          </DialogHeader>
+
+          {/* Crop area */}
+          <div className="px-4">
+            <div
+              ref={cropContainerRef}
+              className="relative w-[280px] h-[280px] mx-auto overflow-hidden rounded-xl bg-white cursor-grab active:cursor-grabbing select-none"
+              onMouseDown={handleCropMouseDown}
+              onMouseMove={handleCropMouseMove}
+              onMouseUp={handleCropMouseUp}
+              onMouseLeave={handleCropMouseUp}
+              onWheel={(e) => {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? -0.05 : 0.05;
+                setCropZoom(z => Math.min(3, Math.max(0.5, z + delta)));
+              }}
+            >
+              {/* Image */}
+              {rawImageUrl && (
+                <img
+                  ref={(el) => { cropImgRef.current = el; }}
+                  src={rawImageUrl}
+                  alt="Crop preview"
+                  draggable={false}
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: '50%',
+                    top: '50%',
+                    transform: `translate(calc(-50% + ${cropOffset.x}px), calc(-50% + ${cropOffset.y}px)) scale(${cropZoom})`,
+                    maxWidth: '100%',
+                    maxHeight: '100%',
+                    objectFit: 'contain',
+                  }}
+                />
+              )}
+
+              {/* Dark overlay with square cutout */}
+              <div className="absolute inset-0 pointer-events-none">
+                {/* Top */}
+                <div className="absolute top-0 left-0 right-0 bg-white/60" style={{ height: '30px' }} />
+                {/* Bottom */}
+                <div className="absolute bottom-0 left-0 right-0 bg-white/60" style={{ height: '30px' }} />
+                {/* Left */}
+                <div className="absolute left-0 bg-white/60" style={{ top: '30px', bottom: '30px', width: '30px' }} />
+                {/* Right */}
+                <div className="absolute right-0 bg-white/60" style={{ top: '30px', bottom: '30px', width: '30px' }} />
+                {/* Highlight border */}
+                <div
+                  className="absolute border-2 border-gray-400 rounded-2xl"
+                  style={{
+                    top: '30px',
+                    left: '30px',
+                    right: '30px',
+                    bottom: '30px',
+                  }}
+                />
+                {/* Corner markers */}
+                <div className="absolute w-4 h-4 border-t-2 border-l-2 border-gray-500 rounded-tl-lg" style={{ top: '28px', left: '28px' }} />
+                <div className="absolute w-4 h-4 border-t-2 border-r-2 border-gray-500 rounded-tr-lg" style={{ top: '28px', right: '28px' }} />
+                <div className="absolute w-4 h-4 border-b-2 border-l-2 border-gray-500 rounded-bl-lg" style={{ left: '28px', bottom: '28px' }} />
+                <div className="absolute w-4 h-4 border-b-2 border-r-2 border-gray-500 rounded-br-lg" style={{ right: '28px', bottom: '28px' }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Zoom controls */}
+          <div className="flex items-center justify-center gap-3 px-4 py-3">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 rounded-full"
+              onClick={() => setCropZoom(z => Math.max(0.5, z - 0.1))}
+            >
+              <ZoomOut className="w-4 h-4" />
+            </Button>
+            <input
+              type="range"
+              min="0.5"
+              max="3"
+              step="0.05"
+              value={cropZoom}
+              onChange={(e) => setCropZoom(parseFloat(e.target.value))}
+              className="w-40 accent-primary"
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 rounded-full"
+              onClick={() => setCropZoom(z => Math.min(3, z + 0.1))}
+            >
+              <ZoomIn className="w-4 h-4" />
+            </Button>
+            <span className="text-xs text-muted-foreground w-10 text-center">{Math.round(cropZoom * 100)}%</span>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3 px-4 pb-4">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => { setCropDialogOpen(false); setRawImageUrl(null); }}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={handleCropConfirm}
+            >
+              Set as Profile Picture
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Form Fields */}
       <div className="space-y-4">
@@ -588,18 +812,135 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="age" className="flex items-center gap-2">
+            <Label htmlFor="dob" className="flex items-center gap-2">
               <Calendar className="w-4 h-4" />
-              Age <span className="text-red-500">*</span>
+              Date of Birth <span className="text-red-500">*</span>
             </Label>
-            <Input
-              id="age"
-              type="number"
-              min="1"
-              placeholder="Ex: 25"
-              value={data.age}
-              onChange={(e) => handleInputChange('age', e.target.value)}
-            />
+            {(() => {
+              // eslint-disable-next-line react-hooks/rules-of-hooks
+              const [dobView, setDobView] = useState<'year' | 'month' | 'day'>('day');
+              // eslint-disable-next-line react-hooks/rules-of-hooks
+              const [dobNavMonth, setDobNavMonth] = useState<Date>(
+                data.dob ? new Date(data.dob) : new Date(new Date().getFullYear() - 25, 0)
+              );
+
+              const currentYear = new Date().getFullYear();
+              const startYear = 1945;
+              const allYears = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i).reverse();
+              const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+              return (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={`w-full justify-start text-left font-normal ${
+                        !data.dob ? 'text-muted-foreground' : ''
+                      }`}
+                    >
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {data.dob
+                        ? format(new Date(data.dob), 'PPP')
+                        : 'Select your date of birth'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    {dobView === 'year' && (
+                      <div className="p-3 w-[280px]">
+                        <div className="text-center font-semibold text-sm mb-3">Select Year</div>
+                        <div className="grid grid-cols-4 gap-1.5 max-h-[240px] overflow-y-auto">
+                          {allYears.map(y => (
+                            <button
+                              key={y}
+                              onClick={() => {
+                                setDobNavMonth(new Date(y, dobNavMonth.getMonth()));
+                                setDobView('month');
+                              }}
+                              className={`text-sm py-1.5 rounded-md transition-colors hover:bg-primary hover:text-primary-foreground ${
+                                dobNavMonth.getFullYear() === y
+                                  ? 'bg-primary text-primary-foreground font-medium'
+                                  : 'hover:bg-accent'
+                              }`}
+                            >
+                              {y}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {dobView === 'month' && (
+                      <div className="p-3 w-[280px]">
+                        <button
+                          onClick={() => setDobView('year')}
+                          className="w-full text-center font-semibold text-sm mb-3 hover:text-primary transition-colors cursor-pointer"
+                        >
+                          {dobNavMonth.getFullYear()} ▾
+                        </button>
+                        <div className="grid grid-cols-3 gap-2">
+                          {monthNames.map((name, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => {
+                                setDobNavMonth(new Date(dobNavMonth.getFullYear(), idx));
+                                setDobView('day');
+                              }}
+                              className={`text-sm py-2.5 rounded-md transition-colors hover:bg-primary hover:text-primary-foreground ${
+                                dobNavMonth.getMonth() === idx
+                                  ? 'bg-primary text-primary-foreground font-medium'
+                                  : 'hover:bg-accent'
+                              }`}
+                            >
+                              {name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {dobView === 'day' && (
+                      <CalendarComponent
+                        mode="single"
+                        month={dobNavMonth}
+                        onMonthChange={setDobNavMonth}
+                        selected={data.dob ? new Date(data.dob) : undefined}
+                        onSelect={(date) => {
+                          if (date) {
+                            const y = date.getFullYear();
+                            const m = String(date.getMonth() + 1).padStart(2, '0');
+                            const d = String(date.getDate()).padStart(2, '0');
+                            handleInputChange('dob', `${y}-${m}-${d}`);
+                          }
+                        }}
+                        disabled={(date) => date > new Date() || date < new Date('1920-01-01')}
+                        initialFocus
+                        className="rounded-md border"
+                        classNames={{
+                          caption_label: 'text-sm font-medium cursor-pointer hover:text-primary hover:underline transition-colors',
+                        }}
+                        onDayClick={() => {}}
+                        formatters={{
+                          formatCaption: (date) => {
+                            return `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+                          },
+                        }}
+                        components={{
+                          CaptionLabel: ({ displayMonth }: { displayMonth: Date }) => (
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setDobView('year');
+                              }}
+                              className="text-sm font-medium cursor-pointer hover:text-primary hover:underline underline-offset-2 transition-colors flex items-center gap-1"
+                            >
+                              {monthNames[displayMonth.getMonth()]} {displayMonth.getFullYear()} ▾
+                            </button>
+                          ),
+                        }}
+                      />
+                    )}
+                  </PopoverContent>
+                </Popover>
+              );
+            })()}
           </div>
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
