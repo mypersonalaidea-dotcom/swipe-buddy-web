@@ -135,6 +135,11 @@ export default {
 						transform: 'translateX(0)',
 						opacity: '1'
 					}
+				},
+				'shake': {
+					'0%, 100%': { transform: 'translateX(0)' },
+					'10%, 30%, 50%, 70%, 90%': { transform: 'translateX(-4px)' },
+					'20%, 40%, 60%, 80%': { transform: 'translateX(4px)' }
 				}
 			},
 			animation: {
@@ -143,7 +148,8 @@ export default {
 				'fade-in': 'fade-in 0.5s ease-out',
 				'slide-in': 'slide-in 0.3s ease-out',
 				'swipe-out-right': 'swipe-out-right 0.3s ease-out',
-				'swipe-out-left': 'swipe-out-left 0.3s ease-out'
+				'swipe-out-left': 'swipe-out-left 0.3s ease-out',
+				'shake': 'shake 0.5s ease-in-out'
 			},
 			backgroundImage: {
 				'gradient-primary': 'var(--gradient-primary)',
