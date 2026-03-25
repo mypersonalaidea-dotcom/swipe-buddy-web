@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import type { Flat } from "./useFlats";
 
 // ---- Types ----
 
@@ -53,6 +54,7 @@ export interface UserProfile {
   education_experiences?: ProfileEducation[];
   user_habits?: ProfileHabit[];
   looking_for_habits?: ProfileHabit[];
+  flats?: Flat[];
 }
 
 // ---- Profile ----

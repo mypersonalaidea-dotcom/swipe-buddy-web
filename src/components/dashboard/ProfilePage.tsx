@@ -152,34 +152,96 @@ export const ProfilePage = () => {
   const { user: authUser } = useAuth();
 
   // Helper: convert API profile → local UserProfile shape
-  const apiToLocal = (): UserProfile => ({
-    name: apiProfile?.name ?? "",
-    age: apiProfile?.age?.toString() ?? "",
-    gender: apiProfile?.gender ?? "",
-    phone: apiProfile?.phone ?? "",
-    email: apiProfile?.email ?? "",
-    city: apiProfile?.city ?? "",
-    state: apiProfile?.state ?? "",
-    profilePictureUrl: apiProfile?.profile_picture_url ?? "",
-    jobExperiences: (apiJobs ?? []).map(j => ({
-      id: j.id,
-      company: j.company?.name ?? j.company_name ?? "",
-      position: j.position?.name ?? j.position_name ?? "",
-      fromYear: j.from_year ?? "",
-      tillYear: j.till_year ?? "",
-      currentlyWorking: j.currently_working,
-    })),
-    educationExperiences: (apiEducation ?? []).map(e => ({
-      id: e.id,
-      institution: e.institution?.name ?? e.institution_name ?? "",
-      degree: e.degree?.common_name ?? e.degree_name ?? "",
-      startYear: e.start_year ?? "",
-      endYear: e.end_year ?? "",
-    })),
-    searchType: (apiProfile?.search_type ?? "flat") as "flat" | "flatmate" | "both",
-    flatDetails: { address: "", flatType: "", flatFurnishing: "", rooms: [], commonAmenities: [], description: "", commonMedia: [] },
-    myHabits: (apiHabits ?? []).map(h => h.habit.label),
-  });
+  const apiToLocal = (): UserProfile => {
+    // Map the user's first flat (if any) into the local flatDetails shape
+    const apiFlat = apiProfile?.flats?.[0];
+
+    // Reverse mapping: API furnishing_type → local flatFurnishing key
+    const furnishingReverseMap: Record<string, string> = {
+      furnished: "fully-furnished",
+      semifurnished: "semi-furnished",
+      unfurnished: "non-furnished",
+    };
+
+    const flatDetails = apiFlat
+      ? {
+          address: apiFlat.address ?? "",
+          flatType: (apiFlat as any).flat_type ?? "",
+          flatFurnishing: furnishingReverseMap[apiFlat.furnishing_type] ?? "",
+          rooms: (apiFlat.rooms ?? []).map((r) => ({
+            id: r.id,
+            roomType: r.room_type,
+            quantity: String(r.available_count ?? 1),
+            rent: r.rent != null ? String(r.rent) : "",
+            securityDeposit:
+              r.security_deposit != null ? String(r.security_deposit) : "",
+            brokerage: r.brokerage != null ? String(r.brokerage) : "",
+            availableFrom: r.available_from ?? "",
+            amenities: (r.room_amenities ?? []).map((a) => a.amenity.name),
+            media: (r.media ?? []).map((m, i) => ({
+              id: `room-media-${i}`,
+              file: null as unknown as File,
+              url: m.media_url,
+              type: (m.media_type === "video" ? "video" : "image") as
+                | "image"
+                | "video",
+            })),
+          })),
+          commonAmenities: (apiFlat.common_amenities ?? []).map(
+            (a) => a.amenity.name
+          ),
+          description: apiFlat.description ?? "",
+          commonMedia: (apiFlat.media ?? []).map((m, i) => ({
+            id: `common-media-${i}`,
+            file: null as unknown as File,
+            url: m.media_url,
+            type: (m.media_type === "video" ? "video" : "image") as
+              | "image"
+              | "video",
+          })),
+        }
+      : {
+          address: "",
+          flatType: "",
+          flatFurnishing: "",
+          rooms: [],
+          commonAmenities: [],
+          description: "",
+          commonMedia: [],
+        };
+
+    return {
+      name: apiProfile?.name ?? "",
+      age: apiProfile?.age?.toString() ?? "",
+      gender: apiProfile?.gender ?? "",
+      phone: apiProfile?.phone ?? "",
+      email: apiProfile?.email ?? "",
+      city: apiProfile?.city ?? "",
+      state: apiProfile?.state ?? "",
+      profilePictureUrl: apiProfile?.profile_picture_url ?? "",
+      jobExperiences: (apiJobs ?? []).map((j) => ({
+        id: j.id,
+        company: j.company?.name ?? j.company_name ?? "",
+        position: j.position?.name ?? j.position_name ?? "",
+        fromYear: j.from_year ?? "",
+        tillYear: j.till_year ?? "",
+        currentlyWorking: j.currently_working,
+      })),
+      educationExperiences: (apiEducation ?? []).map((e) => ({
+        id: e.id,
+        institution: e.institution?.name ?? e.institution_name ?? "",
+        degree: e.degree?.common_name ?? e.degree_name ?? "",
+        startYear: e.start_year ?? "",
+        endYear: e.end_year ?? "",
+      })),
+      searchType: (apiProfile?.search_type ?? "flat") as
+        | "flat"
+        | "flatmate"
+        | "both",
+      flatDetails,
+      myHabits: (apiHabits ?? []).map((h) => h.habit.label),
+    };
+  };
 
   const [profile, setProfile] = useState<UserProfile>(emptyProfile);
   const [isEditing, setIsEditing] = useState(false);
