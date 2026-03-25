@@ -148,6 +148,39 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
     }
   };
 
+  /**
+   * Upload an array of MediaFile objects to Cloudinary in parallel.
+   * Returns an array of { media_url, media_type } ready for the API.
+   */
+  const uploadMediaFiles = async (
+    files: MediaFile[],
+    folder: string
+  ): Promise<{ media_url: string; media_type: string }[]> => {
+    if (!files || files.length === 0) return [];
+
+    const results = await Promise.all(
+      files.map(async (mf) => {
+        const result = await uploadToCloudinary(mf.file, folder);
+        return {
+          media_url: result.secure_url,
+          media_type: mf.type, // 'image' | 'video'
+        };
+      })
+    );
+    return results;
+  };
+
+  /**
+   * Parse a security_deposit / brokerage string like "2 Month", "15 Day",
+   * or "none|2 Month" → returns null when "none|" prefixed, else the raw
+   * string (which is what the backend expects).
+   */
+  const parseDepositOrBrokerage = (value: string | undefined): string | null => {
+    if (!value) return null;
+    if (value.startsWith("none|")) return null; // user opted out
+    return value; // e.g. "2 Month"
+  };
+
   const handleSubmit = async () => {
     const { personalInfo, housingDetails } = signupData;
     setIsSubmitting(true);
@@ -253,20 +286,57 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
         const latitude  = flatDetails.coordinates?.[1];
         const longitude = flatDetails.coordinates?.[0];
 
-        // Build rooms array for nested creation
-        const rooms = flatDetails.rooms
-          .filter(r => r.roomType)
-          .map((r, idx) => ({
-            room_name: r.roomName || undefined,
-            room_type: r.roomType,
-            rent: r.rent ? parseFloat(r.rent) : undefined,
-            security_deposit: r.securityDeposit ? parseFloat(r.securityDeposit) : undefined,
-            brokerage: r.brokerage ? parseFloat(r.brokerage) : undefined,
-            available_count: r.quantity ? parseInt(r.quantity) : 1,
-            available_from: r.availableFrom || undefined,
-            display_order: idx + 1,
-            amenities: r.amenities || [],
-          }));
+        // ── Upload all media to Cloudinary ───────────────────────────────
+        // Common area media
+        let commonMediaUploaded: { media_url: string; media_type: string }[] = [];
+        if (flatDetails.commonMedia?.length > 0) {
+          try {
+            commonMediaUploaded = await uploadMediaFiles(
+              flatDetails.commonMedia,
+              "swipe-buddy/flats/common"
+            );
+          } catch (err: any) {
+            console.error("Common area media upload failed:", err);
+            toast({
+              title: "Media Upload Warning",
+              description: "Some common area photos/videos failed to upload.",
+              variant: "destructive",
+            });
+          }
+        }
+
+        // Build rooms array for nested creation (upload room media in parallel)
+        const rooms = await Promise.all(
+          flatDetails.rooms
+            .filter(r => r.roomType)
+            .map(async (r, idx) => {
+              // Upload room media
+              let roomMediaUploaded: { media_url: string; media_type: string }[] = [];
+              if (r.media?.length > 0) {
+                try {
+                  roomMediaUploaded = await uploadMediaFiles(
+                    r.media,
+                    "swipe-buddy/flats/rooms"
+                  );
+                } catch (err: any) {
+                  console.error(`Room ${idx + 1} media upload failed:`, err);
+                }
+              }
+
+              return {
+                room_name: r.roomName || undefined,
+                room_type: r.roomType,
+                rent: r.rent ? parseFloat(r.rent) : undefined,
+                security_deposit: parseDepositOrBrokerage(r.securityDeposit),
+                brokerage: parseDepositOrBrokerage(r.brokerage),
+                available_count: r.quantity ? parseInt(r.quantity) : 1,
+                available_from: r.availableFrom || undefined,
+                display_order: idx + 1,
+                amenities: r.amenities || [],
+                media: roomMediaUploaded.length > 0 ? roomMediaUploaded : undefined,
+              };
+            })
+        );
 
         await api.post("/flats", {
           address: flatDetails.address,
@@ -283,6 +353,8 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
           common_amenities: flatDetails.commonAmenities?.length > 0
             ? flatDetails.commonAmenities
             : undefined,
+          // Common area media (Cloudinary URLs)
+          media: commonMediaUploaded.length > 0 ? commonMediaUploaded : undefined,
         });
       }
 
