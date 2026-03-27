@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { MapPin, Briefcase, GraduationCap, Home, Send, Bookmark, MoreVertical, Flag, ShieldOff, ExternalLink, ChevronDown, ChevronUp, DoorOpen, Calendar, IndianRupee } from "lucide-react";
 import { MAPBOX_TOKEN, GOOGLE_MAPS_API_KEY, MAP_PROVIDER } from "@/lib/maps/config";
+import { GoogleMapRenderer } from "@/components/map/GoogleMapRenderer";
+import { MapboxMapRenderer } from "@/components/map/MapboxMapRenderer";
 import { getHabitIcon } from "@/constants/habits";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -260,22 +262,10 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                       }
 
                       const [lng, lat] = coords;
-                      let staticMapUrl = '';
+                      const hasGoogle = MAP_PROVIDER === 'google' && !!GOOGLE_MAPS_API_KEY;
+                      const hasMapbox = MAPBOX_TOKEN && MAPBOX_TOKEN.startsWith('pk.');
 
-                      if (MAP_PROVIDER === 'google' && GOOGLE_MAPS_API_KEY) {
-                        staticMapUrl =
-                          `https://maps.googleapis.com/maps/api/staticmap?` +
-                          `center=${lat},${lng}&zoom=14&size=400x128&scale=2&maptype=roadmap` +
-                          `&markers=color:0x6366f1%7C${lat},${lng}` +
-                          `&key=${GOOGLE_MAPS_API_KEY}`;
-                      } else if (MAPBOX_TOKEN && MAPBOX_TOKEN.startsWith('pk.')) {
-                        staticMapUrl =
-                          `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/` +
-                          `pin-s+6366f1(${lng},${lat})/` +
-                          `${lng},${lat},14/400x128@2x?access_token=${MAPBOX_TOKEN}`;
-                      }
-
-                      if (!staticMapUrl) {
+                      if (!hasGoogle && !hasMapbox) {
                         return (
                           <div className="h-full flex flex-col items-center justify-center gap-1.5">
                             <MapPin className="w-5 h-5 text-muted-foreground/40" />
@@ -286,17 +276,16 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
 
                       return (
                         <>
-                          <img
-                            src={staticMapUrl}
-                            alt="Flat location map"
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
+                          {hasGoogle ? (
+                            <GoogleMapRenderer center={coords} zoom={14} height="100%" readonly className="w-full h-full" />
+                          ) : (
+                            <MapboxMapRenderer center={coords} zoom={14} height="100%" readonly className="w-full h-full" />
+                          )}
                           <a
                             href={`https://www.google.com/maps?q=${lat},${lng}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="absolute bottom-1.5 right-1.5 flex items-center gap-1 text-[10px] bg-background/90 backdrop-blur-sm px-1.5 py-0.5 rounded-full border border-border text-muted-foreground hover:text-foreground transition-colors"
+                            className="absolute bottom-1.5 right-1.5 flex items-center gap-1 text-[10px] bg-background/90 backdrop-blur-sm px-1.5 py-0.5 rounded-full border border-border text-muted-foreground hover:text-foreground transition-colors z-10"
                           >
                             Open in Maps <ExternalLink className="w-2.5 h-2.5" />
                           </a>

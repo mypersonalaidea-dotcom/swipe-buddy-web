@@ -25,6 +25,7 @@ interface MapboxMapRendererProps {
   onMarkerDragEnd?: (result: GeocodeResult) => void;
   height?: string;
   className?: string;
+  readonly?: boolean;
 }
 
 export function MapboxMapRenderer({
@@ -34,6 +35,7 @@ export function MapboxMapRenderer({
   onMarkerDragEnd,
   height = '400px',
   className,
+  readonly = false,
 }: MapboxMapRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -101,7 +103,7 @@ export function MapboxMapRenderer({
       'top-right',
     );
 
-    const marker = new mapboxgl.Marker({ draggable: true, color: '#6366f1' })
+    const marker = new mapboxgl.Marker({ draggable: !readonly, color: '#6366f1' })
       .setLngLat(center)
       .addTo(map);
 
@@ -119,22 +121,24 @@ export function MapboxMapRenderer({
       }
     };
 
-    marker.on('dragend', () => {
-      const lngLat = marker.getLngLat();
-      handleMarkerMoved([lngLat.lng, lngLat.lat]);
-    });
+    if (!readonly) {
+      marker.on('dragend', () => {
+        const lngLat = marker.getLngLat();
+        handleMarkerMoved([lngLat.lng, lngLat.lat]);
+      });
 
-    // Click anywhere on map → move pin there
-    map.on('click', (e) => {
-      const coords: LngLat = [e.lngLat.lng, e.lngLat.lat];
-      marker.setLngLat(coords);
-      handleMarkerMoved(coords);
-    });
+      // Click anywhere on map → move pin there
+      map.on('click', (e) => {
+        const coords: LngLat = [e.lngLat.lng, e.lngLat.lat];
+        marker.setLngLat(coords);
+        handleMarkerMoved(coords);
+      });
+    }
 
     map.on('load', () => {
       updateCircle(map, center, currentRadiusRef.current);
       // Set crosshair cursor to hint click-to-place
-      map.getCanvas().style.cursor = 'crosshair';
+      map.getCanvas().style.cursor = readonly ? 'default' : 'crosshair';
     });
 
     map.on('error', (e) => {

@@ -21,6 +21,7 @@ interface GoogleMapRendererProps {
   onMarkerDragEnd?: (result: GeocodeResult) => void;
   height?: string;
   className?: string;
+  readonly?: boolean;
 }
 
 export function GoogleMapRenderer({
@@ -30,6 +31,7 @@ export function GoogleMapRenderer({
   onMarkerDragEnd,
   height = '400px',
   className,
+  readonly = false,
 }: GoogleMapRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
@@ -51,16 +53,16 @@ export function GoogleMapRenderer({
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: true,
-        draggableCursor: 'crosshair',
+        draggableCursor: readonly ? 'default' : 'crosshair',
         styles: [{ featureType: 'poi', stylers: [{ visibility: 'simplified' }] }],
       });
 
       const marker = new google.maps.Marker({
         position: latLng,
         map,
-        draggable: true,
+        draggable: !readonly,
         animation: google.maps.Animation.DROP,
-        title: 'Drag me to set location',
+        title: readonly ? 'Flat Location' : 'Drag me to set location',
       });
 
       // Reverse-geocode helper for both drag and click
@@ -74,20 +76,22 @@ export function GoogleMapRenderer({
         }
       };
 
-      marker.addListener('dragend', () => {
-        const pos = marker.getPosition();
-        if (!pos) return;
-        handleMarkerMoved([pos.lng(), pos.lat()]);
-      });
+      if (!readonly) {
+        marker.addListener('dragend', () => {
+          const pos = marker.getPosition();
+          if (!pos) return;
+          handleMarkerMoved([pos.lng(), pos.lat()]);
+        });
 
-      // Click anywhere on map → move pin there
-      map.addListener('click', (e: google.maps.MapMouseEvent) => {
-        if (!e.latLng) return;
-        const coords: LngLat = [e.latLng.lng(), e.latLng.lat()];
-        marker.setPosition(e.latLng);
-        marker.setAnimation(google.maps.Animation.DROP);
-        handleMarkerMoved(coords);
-      });
+        // Click anywhere on map → move pin there
+        map.addListener('click', (e: google.maps.MapMouseEvent) => {
+          if (!e.latLng) return;
+          const coords: LngLat = [e.latLng.lng(), e.latLng.lat()];
+          marker.setPosition(e.latLng);
+          marker.setAnimation(google.maps.Animation.DROP);
+          handleMarkerMoved(coords);
+        });
+      }
 
       mapRef.current = map;
       markerRef.current = marker;
