@@ -468,7 +468,9 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                   <h6 className="text-sm font-medium text-foreground">Common Area Photos</h6>
                   <div className="grid grid-cols-3 gap-2">
                     {profile.flatDetails.commonPhotos.map((photo, idx) => (
-                      <div key={idx} className="bg-muted aspect-video rounded-lg" />
+                      <div key={idx} className="bg-muted aspect-video rounded-lg overflow-hidden">
+                        <img src={photo} alt={`Common Area ${idx + 1}`} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
+                      </div>
                     ))}
                   </div>
                 </div>

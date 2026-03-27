@@ -35,6 +35,7 @@ import {
   useMyHabits, useUpdateHabits,
 } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
+import { useFlats, useUpdateFlat } from "@/hooks/useFlats";
 import { useCompanies, usePositions, useInstitutions, useDegrees } from "@/hooks/useMasterData";
 
 interface JobExperience {
@@ -63,6 +64,7 @@ interface MediaFile {
 
 interface RoomDetails {
   id: string;
+  roomName: string;
   roomType: "private" | "shared" | "studio";
   quantity: string;
   rent: string;
@@ -142,6 +144,7 @@ export const ProfilePage = () => {
   const updateEduMutation = useUpdateEducation();
   const deleteEduMutation = useDeleteEducation();
   const updateHabitsMutation = useUpdateHabits();
+  const updateFlatMutation = useUpdateFlat();
 
   // ---- Master data hooks ----
   const { data: masterCompanies = [] } = useCompanies();
@@ -170,6 +173,7 @@ export const ProfilePage = () => {
           flatFurnishing: furnishingReverseMap[apiFlat.furnishing_type] ?? "",
           rooms: (apiFlat.rooms ?? []).map((r) => ({
             id: r.id,
+            roomName: r.room_name ?? "",
             roomType: r.room_type,
             quantity: String(r.available_count ?? 1),
             rent: r.rent != null ? String(r.rent) : "",
@@ -426,13 +430,64 @@ export const ProfilePage = () => {
         }
       }
 
+      // 4. Sync flat details
+      const apiFlat = apiProfile?.flats?.[0];
+      const { flatDetails } = editedProfile;
+      const furnishingMap: Record<string, string> = {
+        "fully-furnished": "furnished",
+        "semi-furnished": "semifurnished",
+        "non-furnished": "unfurnished",
+      };
+
+      if (editedProfile.searchType !== 'flatmate' && editedProfile.searchType !== 'both') {
+        // Skip flat saving if user is not a flat seeker with a flat
+      } else if (apiFlat) {
+        // Update existing flat
+        await updateFlatMutation.mutateAsync({
+          id: apiFlat.id,
+          address: flatDetails.address,
+          flat_type: flatDetails.flatType || undefined,
+          furnishing_type: furnishingMap[flatDetails.flatFurnishing] || "unfurnished",
+          description: flatDetails.description || undefined,
+          is_published: true,
+          // Sync rooms
+          rooms: flatDetails.rooms.map((r, idx) => ({
+            id: r.id.startsWith('profile-') || isNaN(Number(r.id)) ? undefined : r.id,
+            room_name: r.roomName || undefined,
+            room_type: r.roomType,
+            rent: r.rent ? parseFloat(r.rent) : 0,
+            security_deposit: r.securityDeposit && !r.securityDeposit.startsWith('none|') ? parseInt(r.securityDeposit.replace('none|', '').split(' ')[0] || '0') : 0,
+            brokerage: r.brokerage && !r.brokerage.startsWith('none|') ? parseInt(r.brokerage.replace('none|', '').split(' ')[0] || '0') : 0,
+            available_count: r.quantity ? parseInt(r.quantity) : 1,
+            available_from: r.availableFrom || undefined,
+            display_order: idx + 1,
+            room_amenities: r.amenities || [],
+            media: (r.media || []).map(m => ({ media_url: m.url, media_type: m.type })),
+          })),
+          common_amenities: flatDetails.commonAmenities || [],
+          media: (flatDetails.commonMedia || []).map(m => ({ media_url: m.url, media_type: m.type })),
+        });
+      }
+
+      // 5. Sync habits
+      const habitIds = editedProfile.myHabits.map(label => {
+        // Try to find the habit object from apiHabits to get its real DB ID
+        const existingHabit = apiHabits?.find(h => h.habit.label === label);
+        return existingHabit?.habit?.id;
+      }).filter(Boolean) as string[];
+
+      if (habitIds.length > 0) {
+        await updateHabitsMutation.mutateAsync(habitIds);
+      }
+
       setProfile({ ...editedProfile });
       setIsEditing(false);
       toast({ title: "Profile Updated", description: "Your profile has been saved successfully." });
     } catch (err: any) {
+      console.error("Profile Save Error:", err);
       toast({
         title: "Save Failed",
-        description: err?.response?.data?.message || "Could not save profile. Please try again.",
+        description: err?.response?.data?.message || err?.message || "Could not save profile.",
         variant: "destructive",
       });
     }
@@ -521,7 +576,8 @@ export const ProfilePage = () => {
   // --- Housing tab: room management (matches signup) ---
   const addRoom = () => {
     const newRoom: RoomDetails = {
-      id: Date.now().toString(),
+      id: `profile-${Date.now()}`,
+      roomName: "",
       roomType: "private",
       quantity: "",
       rent: "",

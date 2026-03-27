@@ -3,6 +3,7 @@ import api from "@/lib/api";
 
 export interface FlatRoom {
   id: string;
+  room_name?: string | null;
   room_type: "private" | "shared" | "studio";
   rent: number;
   security_deposit: number;
@@ -58,20 +59,24 @@ export const useFlatById = (id: string | undefined) => {
 export const useCreateFlat = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (data: {
-      address: string;
-      city: string;
-      state: string;
-      pincode?: string;
-      latitude?: number;
-      longitude?: number;
-      furnishing_type: "furnished" | "semifurnished" | "unfurnished";
-      description?: string;
-      is_published?: boolean;
-    }) => {
+    mutationFn: async (data: { [key: string]: any }) => {
       const res = await api.post("/flats", data);
       return res.data.data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["flats"] }),
+  });
+};
+
+export const useUpdateFlat = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...data }: { id: string; [key: string]: any }) => {
+      const res = await api.put(`/flats/${id}`, data);
+      return res.data.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["flats"] });
+      qc.invalidateQueries({ queryKey: ["profile"] });
+    },
   });
 };
