@@ -74,7 +74,7 @@ export const HomePage = () => {
   const profiles = (flatsData ?? []).map(flat => ({
     id: flat.id,
     name: flat.user?.name ?? "Unknown",
-    age: 0,
+    age: flat.user?.age ?? 0,
     city: flat.city ?? "Unknown",
     state: flat.state ?? "",
     gender: "",

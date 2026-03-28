@@ -27,7 +27,7 @@ export interface Flat {
   flat_type?: string | null;
   description?: string;
   is_published: boolean;
-  user: { id: string; name: string; profile_picture_url: string | null };
+  user: { id: string; name: string; age?: number; profile_picture_url: string | null };
   rooms: FlatRoom[];
   common_amenities: { amenity: { name: string; icon_name: string } }[];
   media: { media_url: string; media_type: string }[];
