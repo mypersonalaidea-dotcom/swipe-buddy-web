@@ -76,7 +76,7 @@ export const HomePage = () => {
   // --- Real flat profiles from API ---
   const { data: flatsData, isLoading: flatsLoading } = useFlats(appliedFilters);
   const profiles = (flatsData ?? []).map(flat => ({
-    id: flat.id,
+    id: flat.user?.id || flat.id,
     name: flat.user?.name ?? "Unknown",
     age: flat.user?.age ?? 0,
     city: flat.city ?? "Unknown",
@@ -89,6 +89,7 @@ export const HomePage = () => {
     jobExperiences: flat.user?.workExperience ?? [],
     educationExperiences: flat.user?.education ?? [],
     flatDetails: {
+      id: flat.id, // Keep flat ID for reference
       address: flat.address ?? "",
       coordinates: flat.latitude && flat.longitude
         ? [parseFloat(flat.longitude), parseFloat(flat.latitude)] as [number, number]
