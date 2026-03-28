@@ -79,7 +79,7 @@ export const HomePage = () => {
   const { data: savedProfilesData = [] } = useSavedProfiles();
 
   const profiles = (flatsData ?? []).map(flat => {
-    const profileId = flat.user?.id || flat.id;
+    const profileId = flat.user_id;
     const isSaved = savedProfilesData.some(p => p.id === profileId);
 
     return {

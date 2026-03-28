@@ -8,7 +8,7 @@ import { MAPBOX_TOKEN, GOOGLE_MAPS_API_KEY, MAP_PROVIDER } from "@/lib/maps/conf
 import { GoogleMapRenderer } from "@/components/map/GoogleMapRenderer";
 import { MapboxMapRenderer } from "@/components/map/MapboxMapRenderer";
 import { getHabitIcon } from "@/constants/habits";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useSaveProfile } from "@/hooks/useSocial";
 import {

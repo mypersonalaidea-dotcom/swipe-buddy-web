@@ -20,6 +20,7 @@ export interface Flat {
   address: string;
   city: string;
   state: string;
+  user_id: string;
   pincode?: string;
   latitude?: string | null;
   longitude?: string | null;
@@ -27,10 +28,10 @@ export interface Flat {
   flat_type?: string | null;
   description?: string;
   is_published: boolean;
-  user: { 
-    id: string; 
-    name: string; 
-    age?: number; 
+  user: {
+    id: string;
+    name: string;
+    age?: number;
     gender?: string;
     profile_picture_url: string | null;
     workExperience?: string[];
