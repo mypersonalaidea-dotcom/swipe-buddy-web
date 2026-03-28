@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { useFlats } from "@/hooks/useFlats";
 import { useUpdateSearchPreferences } from "@/hooks/useProfile";
+import { useSavedProfiles } from "@/hooks/useSocial";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -75,42 +76,50 @@ export const HomePage = () => {
   
   // --- Real flat profiles from API ---
   const { data: flatsData, isLoading: flatsLoading } = useFlats(appliedFilters);
-  const profiles = (flatsData ?? []).map(flat => ({
-    id: flat.user?.id || flat.id,
-    name: flat.user?.name ?? "Unknown",
-    age: flat.user?.age ?? 0,
-    city: flat.city ?? "Unknown",
-    state: flat.state ?? "",
-    gender: flat.user?.gender ?? "",
-    profilePicture: flat.user?.profile_picture_url ?? "",
-    searchType: "flatmate" as const,
-    myHabits: flat.user?.user_habits ?? [],
-    lookingForHabits: [] as string[],
-    jobExperiences: flat.user?.workExperience ?? [],
-    educationExperiences: flat.user?.education ?? [],
-    flatDetails: {
-      id: flat.id, // Keep flat ID for reference
-      address: flat.address ?? "",
-      coordinates: flat.latitude && flat.longitude
-        ? [parseFloat(flat.longitude), parseFloat(flat.latitude)] as [number, number]
-        : undefined,
-      furnishingType: flat.furnishing_type ?? "",
-      commonAmenities: flat.common_amenities ?? [],
-      commonPhotos: flat.media?.filter(m => m.media_type === "image").map(m => m.media_url) ?? [],
-      rooms: (flat.rooms ?? []).map(r => ({
-        id: r.id,
-        type: r.room_type,
-        rent: `₹${Number(r.rent || 0).toLocaleString()}/mo`,
-        available: r.available_count,
-        securityDeposit: `${r.security_deposit} mo`,
-        brokerage: r.brokerage ? `${r.brokerage} days` : undefined,
-        availableFrom: r.available_from ?? "",
-        furnishingType: r.furnishing_type ?? flat.furnishing_type ?? "",
-        amenities: r.room_amenities ?? [],
-        photos: r.media?.filter(m => m.media_type === "image").map(m => m.media_url) ?? [],
-      })),
-    },
-  }));
+  const { data: savedProfilesData = [] } = useSavedProfiles();
+
+  const profiles = (flatsData ?? []).map(flat => {
+    const profileId = flat.user?.id || flat.id;
+    const isSaved = savedProfilesData.some(p => p.id === profileId);
+
+    return {
+      id: profileId,
+      name: flat.user?.name ?? "Unknown",
+      age: flat.user?.age ?? 0,
+      city: flat.city ?? "Unknown",
+      state: flat.state ?? "",
+      gender: flat.user?.gender ?? "",
+      profilePicture: flat.user?.profile_picture_url ?? "",
+      searchType: "flatmate" as const,
+      isSaved: isSaved,
+      myHabits: flat.user?.user_habits ?? [],
+      lookingForHabits: [] as string[],
+      jobExperiences: flat.user?.workExperience ?? [],
+      educationExperiences: flat.user?.education ?? [],
+      flatDetails: {
+        id: flat.id, // Keep flat ID for reference
+        address: flat.address ?? "",
+        coordinates: flat.latitude && flat.longitude
+          ? [parseFloat(flat.longitude), parseFloat(flat.latitude)] as [number, number]
+          : undefined,
+        furnishingType: flat.furnishing_type ?? "",
+        commonAmenities: flat.common_amenities ?? [],
+        commonPhotos: flat.media?.filter(m => m.media_type === "image").map(m => m.media_url) ?? [],
+        rooms: (flat.rooms ?? []).map(r => ({
+          id: r.id,
+          type: r.room_type,
+          rent: `₹${Number(r.rent || 0).toLocaleString()}/mo`,
+          available: r.available_count,
+          securityDeposit: `${r.security_deposit} mo`,
+          brokerage: r.brokerage ? `${r.brokerage} days` : undefined,
+          availableFrom: r.available_from ?? "",
+          furnishingType: r.furnishing_type ?? flat.furnishing_type ?? "",
+          amenities: r.room_amenities ?? [],
+          photos: r.media?.filter(m => m.media_type === "image").map(m => m.media_url) ?? [],
+        })),
+      },
+    };
+  });
 
   const [userSearchType] = useState<"flat" | "flatmate" | "both">("both");
   const [hasFlatDetails, setHasFlatDetails] = useState(
@@ -1109,7 +1118,10 @@ export const HomePage = () => {
             </div>
           ) : profiles[currentIndex] ? (
             <div className={animationDirection === "left" ? "animate-swipe-out-left w-full" : animationDirection === "right" ? "animate-swipe-out-right w-full" : "animate-slide-in w-full"}>
-              <ProfileCard profile={profiles[currentIndex]} />
+              <ProfileCard 
+                profile={profiles[currentIndex]} 
+                isSaved={profiles[currentIndex]?.isSaved} 
+              />
             </div>
           ) : (
             <div className="flex flex-col items-center gap-3 text-muted-foreground">
