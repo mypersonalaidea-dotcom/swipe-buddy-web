@@ -51,11 +51,11 @@ export const AuthFlow = () => {
 
     case "signup":
       return (
-        <div>
-          <div className="p-4">
+        <div className="relative">
+          <div className="absolute top-4 left-4 z-50">
             <button
               onClick={handleBackToLogin}
-              className="text-primary hover:underline text-sm"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium text-rose-600 bg-white/70 backdrop-blur-md border border-rose-100 shadow-sm hover:bg-white/90 hover:shadow-md transition-all duration-200"
             >
               ← Back to Login
             </button>
