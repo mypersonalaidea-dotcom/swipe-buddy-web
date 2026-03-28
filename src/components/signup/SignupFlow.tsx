@@ -169,13 +169,13 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
     );
     return results;
   };
-
   const handleSubmit = async () => {
     const { personalInfo, housingDetails } = signupData;
     setIsSubmitting(true);
 
     try {
-      // 0. Upload profile picture to Cloudinary (if provided)
+      // ── Step 0: Upload ALL media in parallel ───────────────────────────
+      // 0a. Profile picture
       let profilePictureUrl: string | undefined;
       if (personalInfo.profilePicture) {
         try {
@@ -194,90 +194,14 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
         }
       }
 
-      // Calculate age from DOB
-      const dobDate = new Date(personalInfo.dob);
-      const today = new Date();
-      let age = today.getFullYear() - dobDate.getFullYear();
-      const monthDiff = today.getMonth() - dobDate.getMonth();
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dobDate.getDate())) age--;
-
-      // 1. Create account (with all mandatory fields)
-      await signup({
-        name: personalInfo.name,
-        email: personalInfo.email,
-        password: personalInfo.password,
-        phone: personalInfo.phone,
-        age: age || 0,
-        gender: personalInfo.gender,
-      });
-
-      // Derive city/state from flat details if available
       const { flatDetails, searchType } = housingDetails;
-      const userCity = flatDetails.city || undefined;
-      const userState = flatDetails.state || undefined;
 
-      // 2. Update profile with all additional fields
-      await api.put("/profile", {
-        age: age || undefined,
-        gender: personalInfo.gender || undefined,
-        search_type: housingDetails.searchType,
-        phone_verified: personalInfo.phoneVerified,
-        email_verified: personalInfo.emailVerified,
-        city: userCity,
-        state: userState,
-        ...(profilePictureUrl && { profile_picture_url: profilePictureUrl }),
-      });
+      // 0b. Flat & Room Media (if owner)
+      let commonMediaUploaded: { media_url: string; media_type: string }[] = [];
+      let roomsData: any[] = [];
 
-      // 3. Add job experiences (parallel)
-      if (personalInfo.jobExperiences.length > 0) {
-        await Promise.all(
-          personalInfo.jobExperiences
-            .filter(j => j.company || j.position)
-            .map((j, idx) =>
-              api.post("/profile/jobs", {
-                company_name: j.company || undefined,
-                position_name: j.position || undefined,
-                from_year: j.fromYear || undefined,
-                till_year: j.currentlyWorking ? undefined : (j.tillYear || undefined),
-                currently_working: j.currentlyWorking,
-                display_order: idx + 1,
-              })
-            )
-        );
-      }
-
-      // 4. Add education experiences (parallel)
-      if (personalInfo.educationExperiences.length > 0) {
-        await Promise.all(
-          personalInfo.educationExperiences
-            .filter(e => e.institution || e.degree)
-            .map((e, idx) =>
-              api.post("/profile/education", {
-                institution_name: e.institution || undefined,
-                degree_name: e.degree || undefined,
-                start_year: e.startYear || undefined,
-                end_year: e.endYear || undefined,
-                display_order: idx + 1,
-              })
-            )
-        );
-      }
-
-      // 5. Create flat listing with rooms + amenities if user has flat details
       if ((searchType === "flatmate" || searchType === "both") && flatDetails.address) {
-        const furnishingMap: Record<string, string> = {
-          "fully-furnished": "furnished",
-          "semi-furnished": "semifurnished",
-          "non-furnished": "unfurnished",
-        };
-
-        // Extract lat/lng from coordinates [lng, lat]
-        const latitude  = flatDetails.coordinates?.[1];
-        const longitude = flatDetails.coordinates?.[0];
-
-        // ── Upload all media to Cloudinary ───────────────────────────────
         // Common area media
-        let commonMediaUploaded: { media_url: string; media_type: string }[] = [];
         if (flatDetails.commonMedia?.length > 0) {
           try {
             commonMediaUploaded = await uploadMediaFiles(
@@ -286,20 +210,14 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
             );
           } catch (err: any) {
             console.error("Common area media upload failed:", err);
-            toast({
-              title: "Media Upload Warning",
-              description: "Some common area photos/videos failed to upload.",
-              variant: "destructive",
-            });
           }
         }
 
-        // Build rooms array for nested creation (upload room media in parallel)
-        const rooms = await Promise.all(
+        // Room media (and prepare room records)
+        roomsData = await Promise.all(
           flatDetails.rooms
             .filter(r => r.roomType)
             .map(async (r, idx) => {
-              // Upload room media
               let roomMediaUploaded: { media_url: string; media_type: string }[] = [];
               if (r.media?.length > 0) {
                 try {
@@ -326,8 +244,25 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
               };
             })
         );
+      }
 
-        await api.post("/flats", {
+      // Calculate age
+      const dobDate = new Date(personalInfo.dob);
+      const today = new Date();
+      let age = today.getFullYear() - dobDate.getFullYear();
+      const monthDiff = today.getMonth() - dobDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dobDate.getDate())) age--;
+
+      // ── Step 1: Prepare Flat Details ──────────────────────────────────
+      let flat_details: any = undefined;
+      if ((searchType === "flatmate" || searchType === "both") && flatDetails.address) {
+        const furnishingMap: Record<string, string> = {
+          "fully-furnished": "furnished",
+          "semi-furnished": "semifurnished",
+          "non-furnished": "unfurnished",
+        };
+
+        flat_details = {
           address: flatDetails.address,
           city: flatDetails.city,
           state: flatDetails.state,
@@ -335,19 +270,74 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
           furnishing_type: furnishingMap[flatDetails.flatFurnishing] || "unfurnished",
           description: flatDetails.description || undefined,
           is_published: true,
-          ...(latitude  !== undefined && { latitude }),
-          ...(longitude !== undefined && { longitude }),
-          // Nested rooms + amenities
-          rooms: rooms.length > 0 ? rooms : undefined,
+          latitude: flatDetails.coordinates?.[1],
+          longitude: flatDetails.coordinates?.[0],
+          rooms: roomsData.length > 0 ? roomsData : undefined,
           common_amenities: flatDetails.commonAmenities?.length > 0
             ? flatDetails.commonAmenities
             : undefined,
-          // Common area media (Cloudinary URLs)
           media: commonMediaUploaded.length > 0 ? commonMediaUploaded : undefined,
-        });
+        };
       }
 
-      // 6. Save search preferences (location + radius) for flat seekers
+      // ── Step 2: Unified Signup (Single Transaction on Backend) ───────
+      await signup({
+        name: personalInfo.name,
+        email: personalInfo.email,
+        password: personalInfo.password,
+        phone: personalInfo.phone,
+        age: age || 0,
+        gender: personalInfo.gender,
+        search_type: housingDetails.searchType,
+        city: flatDetails.city || undefined,
+        state: flatDetails.state || undefined,
+        profile_picture_url: profilePictureUrl,
+        flat_details,
+      });
+
+      // ── Step 3: Other Profile Updates (Jobs, Education, Prefs) ───────
+      // Update verification flags (not in signup payload yet)
+      await api.put("/profile", {
+        phone_verified: personalInfo.phoneVerified,
+        email_verified: personalInfo.emailVerified,
+      });
+
+      // Add jobs
+      if (personalInfo.jobExperiences.length > 0) {
+        await Promise.all(
+          personalInfo.jobExperiences
+            .filter(j => j.company || j.position)
+            .map((j, idx) =>
+              api.post("/profile/jobs", {
+                company_name: j.company || undefined,
+                position_name: j.position || undefined,
+                from_year: j.fromYear || undefined,
+                till_year: j.currentlyWorking ? undefined : (j.tillYear || undefined),
+                currently_working: j.currentlyWorking,
+                display_order: idx + 1,
+              })
+            )
+        );
+      }
+
+      // Add education
+      if (personalInfo.educationExperiences.length > 0) {
+        await Promise.all(
+          personalInfo.educationExperiences
+            .filter(e => e.institution || e.degree)
+            .map((e, idx) =>
+              api.post("/profile/education", {
+                institution_name: e.institution || undefined,
+                degree_name: e.degree || undefined,
+                start_year: e.startYear || undefined,
+                end_year: e.endYear || undefined,
+                display_order: idx + 1,
+              })
+            )
+        );
+      }
+
+      // Search preferences
       if ((searchType === "flat" || searchType === "both") && housingDetails.searchLocation) {
         await api.put("/profile/search-preferences", {
           location_search: housingDetails.searchLocation,
