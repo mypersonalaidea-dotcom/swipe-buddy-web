@@ -87,6 +87,11 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
   const isLookingForFlatmate = profile.searchType === "flatmate";
   const { toast } = useToast();
   const [saved, setSaved] = useState(isSaved);
+
+  useEffect(() => {
+    setSaved(isSaved);
+  }, [isSaved, profile.id]);
+
   const [expandedRooms, setExpandedRooms] = useState<Set<string>>(new Set());
 
   // Check if already in conversation (either passed as prop or from mock data)
