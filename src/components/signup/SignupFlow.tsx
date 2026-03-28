@@ -302,13 +302,16 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
 
       // Add jobs
       if (personalInfo.jobExperiences.length > 0) {
+        const isUuid = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
         await Promise.all(
           personalInfo.jobExperiences
             .filter(j => j.company || j.position)
             .map((j, idx) =>
               api.post("/profile/jobs", {
-                company_name: j.company || undefined,
-                position_name: j.position || undefined,
+                company_id: isUuid(j.company) ? j.company : undefined,
+                company_name: isUuid(j.company) ? undefined : (j.company || undefined),
+                position_id: isUuid(j.position) ? j.position : undefined,
+                position_name: isUuid(j.position) ? undefined : (j.position || undefined),
                 from_year: j.fromYear || undefined,
                 till_year: j.currentlyWorking ? undefined : (j.tillYear || undefined),
                 currently_working: j.currentlyWorking,
@@ -320,13 +323,16 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
 
       // Add education
       if (personalInfo.educationExperiences.length > 0) {
+        const isUuid = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
         await Promise.all(
           personalInfo.educationExperiences
             .filter(e => e.institution || e.degree)
             .map((e, idx) =>
               api.post("/profile/education", {
-                institution_name: e.institution || undefined,
-                degree_name: e.degree || undefined,
+                institution_id: isUuid(e.institution) ? e.institution : undefined,
+                institution_name: isUuid(e.institution) ? undefined : (e.institution || undefined),
+                degree_id: isUuid(e.degree) ? e.degree : undefined,
+                degree_name: isUuid(e.degree) ? undefined : (e.degree || undefined),
                 start_year: e.startYear || undefined,
                 end_year: e.endYear || undefined,
                 display_order: idx + 1,

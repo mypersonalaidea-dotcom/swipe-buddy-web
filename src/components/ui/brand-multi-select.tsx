@@ -37,7 +37,7 @@ interface BrandMultiSelectProps {
     options: BrandOption[];
     selectedValues: string[];
     onSelectedValuesChange: (values: string[]) => void;
-    onAddNewBrand: (brand: Omit<BrandOption, "id">) => void;
+    onAddNewBrand: (brand: Omit<BrandOption, "id"> & { logoFile?: File }) => void;
     mode?: "single" | "multiple";
 }
 
@@ -111,8 +111,8 @@ export function BrandMultiSelect({
         if (!addName.trim()) {
             setNameError("Name is required");
             hasError = true;
-        } else if (!/^[A-Za-z\s]+$/.test(addName)) {
-            setNameError("Only space and alphabets allowed, no special characters or numbers.");
+        } else if (!/^[A-Za-z0-9\s.]+$/.test(addName)) {
+            setNameError("Only space, alphabets, numbers and dots allowed.");
             hasError = true;
         } else {
             setNameError("");
@@ -131,6 +131,7 @@ export function BrandMultiSelect({
             name: addName.trim(),
             aliases: aliasesArray,
             logo: addMedia.length > 0 ? addMedia[0].url : undefined,
+            logoFile: addMedia.length > 0 ? addMedia[0].file : undefined,
         };
 
         onAddNewBrand(newBrand);
@@ -310,7 +311,7 @@ export function BrandMultiSelect({
                             {nameError && <p className="text-xs text-destructive">{nameError}</p>}
                             <div className="flex justify-between">
                                 <p className="text-xs text-muted-foreground">
-                                    Only space and alphabets allowed, no special characters or numbers.
+                                    Only space, letters, numbers and dots allowed.
                                 </p>
                                 <p className="text-xs text-muted-foreground whitespace-nowrap ml-2">{addName.length}/50</p>
                             </div>

@@ -45,57 +45,53 @@ export interface MasterAmenity {
 
 const STALE_TIME = 10 * 60 * 1000; // 10 minutes — master data rarely changes
 
-export const useCompanies = () => {
-  const { isAuthenticated } = useAuth();
+export const useCompanies = (enabled = true) => {
   return useQuery<MasterCompany[]>({
     queryKey: ["master", "companies"],
     queryFn: async () => {
       const res = await api.get("/master/companies");
       return res.data.data;
     },
-    enabled: isAuthenticated,
+    enabled,
     staleTime: STALE_TIME,
     select: (data) => data ?? [],
   });
 };
 
-export const usePositions = () => {
-  const { isAuthenticated } = useAuth();
+export const usePositions = (enabled = true) => {
   return useQuery<MasterPosition[]>({
     queryKey: ["master", "positions"],
     queryFn: async () => {
       const res = await api.get("/master/positions");
       return res.data.data;
     },
-    enabled: isAuthenticated,
+    enabled,
     staleTime: STALE_TIME,
     select: (data) => data ?? [],
   });
 };
 
-export const useInstitutions = () => {
-  const { isAuthenticated } = useAuth();
+export const useInstitutions = (enabled = true) => {
   return useQuery<MasterInstitution[]>({
     queryKey: ["master", "institutions"],
     queryFn: async () => {
       const res = await api.get("/master/institutions");
       return res.data.data;
     },
-    enabled: isAuthenticated,
+    enabled,
     staleTime: STALE_TIME,
     select: (data) => data ?? [],
   });
 };
 
-export const useDegrees = () => {
-  const { isAuthenticated } = useAuth();
+export const useDegrees = (enabled = true) => {
   return useQuery<MasterDegree[]>({
     queryKey: ["master", "degrees"],
     queryFn: async () => {
       const res = await api.get("/master/degrees");
       return res.data.data;
     },
-    enabled: isAuthenticated,
+    enabled,
     staleTime: STALE_TIME,
     select: (data) => data ?? [],
   });

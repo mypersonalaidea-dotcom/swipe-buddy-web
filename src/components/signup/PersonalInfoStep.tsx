@@ -13,6 +13,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Upload, User, Users, Phone, PhoneOff, Mail, Calendar, CalendarArrowUp, CalendarArrowDown, UserCheck, GraduationCap, Plus, Trash2, Briefcase, BookOpen, Lock, Eye, EyeOff, ShieldCheck, KeyRound, ZoomIn, ZoomOut, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
+import { uploadToCloudinary } from "@/lib/cloudinary";
+import { useCompanies, usePositions, useInstitutions, useDegrees } from "@/hooks/useMasterData";
 import { BrandMultiSelect, BrandOption } from "@/components/ui/brand-multi-select";
 import {
   Dialog,
@@ -96,78 +98,43 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
 
   const { toast } = useToast();
 
-  const [companiesDb, setCompaniesDb] = useState<BrandOption[]>([
-    { id: "Google", name: "Google", aliases: ["Alphabet"], logo: "https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" },
-    { id: "TCS", name: "TCS", aliases: ["Tata Consultancy Services"], logo: "https://upload.wikimedia.org/wikipedia/commons/b/b1/Tata_Consultancy_Services_Logo.svg" },
-    { id: "Microsoft", name: "Microsoft", logo: "https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg" },
-  ]);
-  const [schoolsDb, setSchoolsDb] = useState<BrandOption[]>([
-    { id: "IIT Delhi", name: "IIT Delhi", aliases: ["Indian Institute of Technology Delhi"], logo: "https://upload.wikimedia.org/wikipedia/en/1/1d/Indian_Institute_of_Technology_Delhi_Logo.svg" },
-    { id: "NIT Trichy", name: "NIT Trichy", aliases: ["National Institute of Technology"], logo: "https://upload.wikimedia.org/wikipedia/en/c/c4/National_Institute_of_Technology%2C_Tiruchirappalli_Logo.png" },
-  ]);
+  const { data: masterCompanies = [] } = useCompanies();
+  const { data: masterInstitutions = [] } = useInstitutions();
+  const { data: masterPositions = [] } = usePositions();
+  const { data: masterDegrees = [] } = useDegrees();
 
-  const [positionOptions, setPositionOptions] = useState<string[]>([
-    "Academic Counselor", "Account Executive", "Account Manager", "Accountant", "Advisor",
-    "Analyst", "Android Developer", "Animator", "Apprentice", "Art Director",
-    "Associate", "Associate Product Manager (APM)", "Auditor",
-    "Backend Developer", "Board Member", "Brand Manager", "Business Analyst",
-    "Business Development Associate", "Business Development Manager",
-    "CEO", "CFO", "CHRO", "CIO", "CISO", "CMO", "COO", "CPO", "CSM", "CTO",
-    "Chartered Accountant (CA)", "Chief Financial Officer", "Clinical Research Associate",
-    "Cloud Architect", "Cloud Engineer", "Co-Founder", "Company Secretary (CS)",
-    "Compensation & Benefits Analyst", "Compliance Officer", "Consultant",
-    "Consultant (Independent)", "Content Strategist", "Content Writer", "Controller",
-    "Copywriter", "Corporate Lawyer", "Creative Director",
-    "Data Analyst", "Data Engineer", "Data Scientist", "Database Administrator (DBA)",
-    "Design Lead", "DevOps Engineer", "Digital Marketing Manager",
-    "Director of Engineering", "Director of Product", "Distinguished Engineer", "Doctor",
-    "Editor", "Embedded Systems Engineer", "Engineering Manager", "Entrepreneur",
-    "Fellow", "Finance Manager", "Financial Analyst", "Founder", "Freelancer",
-    "Frontend Developer", "Full Stack Developer",
-    "Game Developer", "General Counsel", "General Manager", "Graduate Trainee",
-    "Graphic Designer", "Group Product Manager", "Growth Manager",
-    "HR Business Partner", "HR Executive", "HR Manager",
-    "IM", "Instructional Designer", "Interaction Designer", "Intern",
-    "Investment Analyst", "Investment Banker", "iOS Developer",
-    "Journalist",
-    "Key Account Manager",
-    "Lab Technician", "Learning & Development Manager", "Lecturer",
-    "Legal Associate", "Legal Counsel", "Logistics Manager",
-    "Machine Learning Engineer", "Management Consultant", "Management Trainee",
-    "Managing Director", "Marketing Analyst", "Marketing Executive", "Marketing Manager",
-    "Medical Officer", "Mobile Developer",
-    "Network Engineer", "Nurse",
-    "Operations Analyst", "Operations Manager",
-    "Paralegal", "Partner", "People Operations Manager", "Performance Marketer",
-    "Pharmacist", "Photographer", "Platform Engineer", "Portfolio Manager",
-    "President", "Principal Consultant", "Principal Engineer",
-    "Process Improvement Manager", "Procurement Manager",
-    "Product Designer", "Product Manager", "Professor",
-    "QA Analyst", "QA Engineer",
-    "Recruiter", "Research Associate", "Research Scientist", "Risk Analyst",
-    "SDE 1", "SDE 2", "SDE 3", "SDET", "SEO Specialist",
-    "SRE", "SWE", "SWE 1", "SWE 2", "SWE 3",
-    "Sales Associate", "Sales Engineer", "Sales Executive", "Sales Manager",
-    "Security Analyst", "Security Engineer",
-    "Senior Associate", "Senior Consultant", "Senior Engineering Manager",
-    "Senior Product Manager", "Site Reliability Engineer",
-    "Social Media Manager", "Software Architect", "Software Engineer",
-    "Staff Engineer", "Strategy Analyst", "Supply Chain Manager", "Systems Engineer",
-    "Talent Acquisition Specialist", "Tax Consultant", "Teacher", "Team Lead",
-    "Technical Lead", "Test Engineer", "Trainee", "Trainer", "Treasury Analyst",
-    "UI Designer", "UI/UX Developer", "UX Designer", "UX Researcher",
-    "VP of Engineering", "VP of Product", "Vice President",
-    "Video Editor", "Videographer", "Visual Designer",
-    "Warehouse Manager", "Web Developer",
+  const [extraCompanies, setExtraCompanies] = useState<BrandOption[]>([]);
+  const [extraSchools, setExtraSchools] = useState<BrandOption[]>([]);
+  const [extraPositions, setExtraPositions] = useState<string[]>([]);
+  const [extraDegrees, setExtraDegrees] = useState<string[]>([]);
+
+  const companiesDb: BrandOption[] = [
+    ...masterCompanies.map(c => ({ id: c.id, name: c.name, logo: c.logo_url ?? undefined })),
+    ...extraCompanies,
+  ];
+
+  const schoolsDb: BrandOption[] = [
+    ...masterInstitutions.map(i => ({ id: i.id, name: i.name, logo: i.logo_url ?? undefined })),
+    ...extraSchools,
+  ];
+
+  const positionOptions: string[] = [
+    ...masterPositions.map(p => p.name),
+    ...extraPositions,
     "Other"
-  ]);
-  const [degreeOptions, setDegreeOptions] = useState<string[]>([
-    "10th Standard", "12th Standard", "B.A.", "B.Arch", "B.Com", "B.Des", "B.E.", "B.Ed", "B.F.A.", "B.P.Ed",
-    "B.Pharm", "B.Plan", "B.Sc", "B.Sc. Nursing", "B.Tech", "BAMS", "BBA", "BCA", "BDS", "BHM / BHMCT", "BHMS",
-    "BMS", "BPT", "BSW", "BVSc & AH", "CA", "CMA", "CS", "Diploma", "LLB", "LLM", "M.A.", "M.Arch", "M.Com",
-    "M.Des", "M.E.", "M.Pharm", "M.Phil", "M.Sc", "M.Tech", "MBA", "MBBS", "MCA", "MD", "MDS", "MFA", "MPT",
-    "MS", "MSW", "PGDM", "Ph.D.", "Pharm.D", "Other"
-  ]);
+  ];
+
+  const degreeOptions: string[] = [
+    ...masterDegrees.map(d => d.common_name),
+    ...extraDegrees,
+    "Other"
+  ];
+
+  // Placeholder setters for compatibility
+  const setCompaniesDb = () => { };
+  const setSchoolsDb = () => { };
+  const setPositionOptions = () => { };
+  const setDegreeOptions = () => { };
 
   // Password strength calculation
   const getPasswordStrength = (password: string) => {
@@ -1231,10 +1198,33 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
                           const val = vals.length > 0 ? vals[0] : "";
                           updateJobExperience(experience.id, 'company', val);
                         }}
-                        onAddNewBrand={(brand) => {
-                          const newBrand = { ...brand, id: brand.name };
-                          setCompaniesDb((prev) => [...prev, newBrand]);
-                          updateJobExperience(experience.id, 'company', newBrand.id);
+                        onAddNewBrand={async (brand) => {
+                          try {
+                            let logoUrl = brand.logo;
+                            if (brand.logoFile) {
+                              const res = await uploadToCloudinary(brand.logoFile, "swipe-buddy/master/companies");
+                              logoUrl = res.secure_url;
+                            }
+
+                            const apiRes = await api.post("/master/companies", {
+                              name: brand.name,
+                              logo_url: logoUrl,
+                              aliases: brand.aliases
+                            });
+
+                            const newBrand = {
+                              id: apiRes.data.data.id || brand.name,
+                              name: brand.name,
+                              logo: logoUrl,
+                              aliases: brand.aliases
+                            };
+
+                            setExtraCompanies((prev) => [...prev, newBrand]);
+                            updateJobExperience(experience.id, 'company', newBrand.name);
+                            toast({ title: "Submitted for verification!", description: "Entry submitted. It will appear once approved, but you can use it now." });
+                          } catch (err: any) {
+                            toast({ title: "Submission Failed", description: err.message || "Failed to add company", variant: "destructive" });
+                          }
                         }}
                       />
                     </div>
@@ -1392,10 +1382,33 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
                           const val = vals.length > 0 ? vals[0] : "";
                           updateEducationExperience(education.id, 'institution', val);
                         }}
-                        onAddNewBrand={(brand) => {
-                          const newBrand = { ...brand, id: brand.name };
-                          setSchoolsDb((prev) => [...prev, newBrand]);
-                          updateEducationExperience(education.id, 'institution', newBrand.id);
+                        onAddNewBrand={async (brand) => {
+                          try {
+                            let logoUrl = brand.logo;
+                            if (brand.logoFile) {
+                              const res = await uploadToCloudinary(brand.logoFile, "swipe-buddy/master/institutions");
+                              logoUrl = res.secure_url;
+                            }
+
+                            const apiRes = await api.post("/master/institutions", {
+                              name: brand.name,
+                              logo_url: logoUrl,
+                              aliases: brand.aliases
+                            });
+
+                            const newBrand = {
+                              id: apiRes.data.data.id || brand.name,
+                              name: brand.name,
+                              logo: logoUrl,
+                              aliases: brand.aliases
+                            };
+
+                            setExtraSchools((prev) => [...prev, newBrand]);
+                            updateEducationExperience(education.id, 'institution', newBrand.name);
+                            toast({ title: "Submitted for verification!", description: "Entry submitted. It will appear once approved, but you can use it now." });
+                          } catch (err: any) {
+                            toast({ title: "Submission Failed", description: err.message || "Failed to add institution", variant: "destructive" });
+                          }
                         }}
                       />
                     </div>
@@ -1525,28 +1538,34 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
             <Button
               className="mt-2 w-full"
               disabled={!newDegreeFullName.trim() || !newDegreeCommonName.trim()}
-              onClick={() => {
+              onClick={async () => {
                 if (!newDegreeCommonName.trim() || !activeEducationId) return;
 
-                // Add to options at the end, before "Other"
-                setDegreeOptions(prev => {
-                  const withoutOther = prev.filter(d => d !== "Other");
-                  return [...withoutOther, newDegreeCommonName, "Other"];
-                });
+                try {
+                  const res = await api.post("/master/degrees", {
+                    full_name: newDegreeFullName,
+                    common_name: newDegreeCommonName,
+                    other_names: newDegreeOtherNames
+                  });
 
-                // Auto-select the newly added degree
-                updateEducationExperience(activeEducationId, 'degree', newDegreeCommonName);
+                  // Add to extra degrees
+                  setExtraDegrees(prev => [...prev, newDegreeCommonName]);
 
-                // Clean up modal state
-                toast({
-                  title: "Degree Added",
-                  description: "Thanks for expanding our list!"
-                });
-                setNewDegreeFullName("");
-                setNewDegreeCommonName("");
-                setNewDegreeOtherNames("");
-                setShowAddDegreeDialog(false);
-                setActiveEducationId(null);
+                  // Auto-select the newly added degree
+                  updateEducationExperience(activeEducationId, 'degree', newDegreeCommonName);
+
+                  toast({
+                    title: "Entry submitted for verification!",
+                    description: "It will appear in the dropdown once approved."
+                  });
+                  setNewDegreeFullName("");
+                  setNewDegreeCommonName("");
+                  setNewDegreeOtherNames("");
+                  setShowAddDegreeDialog(false);
+                  setActiveEducationId(null);
+                } catch (err: any) {
+                  toast({ title: "Submission Failed", description: err.message || "Failed to add degree", variant: "destructive" });
+                }
               }}
             >
               Add to DB
@@ -1598,25 +1617,32 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
             <Button
               className="mt-2 w-full"
               disabled={!newPositionFullName.trim() || !newPositionCommonName.trim()}
-              onClick={() => {
+              onClick={async () => {
                 if (!newPositionCommonName.trim() || !activeJobIdForPosition) return;
 
-                setPositionOptions(prev => {
-                  const withoutOther = prev.filter(d => d !== "Other");
-                  return [...withoutOther, newPositionCommonName, "Other"];
-                });
+                try {
+                  const res = await api.post("/master/positions", {
+                    full_name: newPositionFullName,
+                    common_name: newPositionCommonName,
+                    other_names: newPositionOtherNames
+                  });
 
-                updateJobExperience(activeJobIdForPosition, 'position', newPositionCommonName);
+                  setExtraPositions(prev => [...prev, newPositionCommonName]);
 
-                toast({
-                  title: "Position Added",
-                  description: "Thanks for expanding our list!"
-                });
-                setNewPositionFullName("");
-                setNewPositionCommonName("");
-                setNewPositionOtherNames("");
-                setShowAddPositionDialog(false);
-                setActiveJobIdForPosition(null);
+                  updateJobExperience(activeJobIdForPosition, 'position', newPositionCommonName);
+
+                  toast({
+                    title: "Entry submitted for verification!",
+                    description: "It will appear in the dropdown once approved."
+                  });
+                  setNewPositionFullName("");
+                  setNewPositionCommonName("");
+                  setNewPositionOtherNames("");
+                  setShowAddPositionDialog(false);
+                  setActiveJobIdForPosition(null);
+                } catch (err: any) {
+                  toast({ title: "Submission Failed", description: err.message || "Failed to add position", variant: "destructive" });
+                }
               }}
             >
               Add to DB
