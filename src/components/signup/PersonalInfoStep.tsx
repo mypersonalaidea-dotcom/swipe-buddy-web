@@ -119,7 +119,7 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
   ];
 
   const positionOptions: string[] = [
-    ...masterPositions.map(p => p.name),
+    ...masterPositions.map(p => p.full_name),
     ...extraPositions,
     "Other"
   ];
@@ -1618,7 +1618,7 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
               className="mt-2 w-full"
               disabled={!newPositionFullName.trim() || !newPositionCommonName.trim()}
               onClick={async () => {
-                if (!newPositionCommonName.trim() || !activeJobIdForPosition) return;
+                if (!newPositionFullName.trim() || !activeJobIdForPosition) return;
 
                 try {
                   const res = await api.post("/master/positions", {
@@ -1627,9 +1627,9 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
                     other_names: newPositionOtherNames
                   });
 
-                  setExtraPositions(prev => [...prev, newPositionCommonName]);
+                  setExtraPositions(prev => [...prev, newPositionFullName]);
 
-                  updateJobExperience(activeJobIdForPosition, 'position', newPositionCommonName);
+                  updateJobExperience(activeJobIdForPosition, 'position', newPositionFullName);
 
                   toast({
                     title: "Entry submitted for verification!",

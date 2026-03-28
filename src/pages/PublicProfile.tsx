@@ -82,7 +82,7 @@ const PublicProfile = () => {
                   </div>
                 ) : (
                   <div key={j.id} className="pl-2 border-l-2 border-primary/30">
-                    <p className="font-medium">{j.position_name || j.position?.name}</p>
+                    <p className="font-medium">{j.position_name || j.position?.full_name}</p>
                     <p className="text-sm text-muted-foreground">
                       {j.company_name || j.company?.name} · {j.from_year} – {j.currently_working ? "Present" : j.till_year}
                     </p>

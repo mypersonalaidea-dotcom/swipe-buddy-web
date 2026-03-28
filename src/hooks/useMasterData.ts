@@ -11,7 +11,9 @@ export interface MasterCompany {
 
 export interface MasterPosition {
   id: string;
-  name: string;
+  full_name: string;
+  common_name: string;
+  other_names?: string[];
 }
 
 export interface MasterInstitution {

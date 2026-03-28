@@ -227,7 +227,7 @@ export const ProfilePage = () => {
       jobExperiences: (apiJobs ?? []).map((j) => ({
         id: j.id,
         company: j.company?.name ?? j.company_name ?? "",
-        position: j.position?.name ?? j.position_name ?? "",
+        position: j.position?.full_name ?? j.position_name ?? "",
         fromYear: j.from_year ?? "",
         tillYear: j.till_year ?? "",
         currentlyWorking: j.currently_working,
@@ -300,7 +300,7 @@ export const ProfilePage = () => {
     setExtraSchools(prev => updater([...masterInstitutions.map(i => ({ id: i.id, name: i.name, logo: i.logo_url ?? undefined })), ...prev]).filter(i => !masterInstitutions.find(m => m.id === i.id)));
 
   const positionOptions: string[] = masterPositions.length > 0
-    ? [...masterPositions.map(p => p.name), "Other"]
+    ? [...masterPositions.map(p => p.full_name), "Other"]
     : ["Software Engineer", "Product Manager", "Designer", "Analyst", "Other"];
 
   const degreeOptions: string[] = masterDegrees.length > 0

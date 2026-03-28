@@ -14,7 +14,7 @@ export interface ProfileJob {
   currently_working: boolean;
   display_order: number;
   company: { id: string; name: string; logo_url: string | null } | null;
-  position: { id: string; name: string } | null;
+  position: { id: string; full_name: string; common_name: string } | null;
 }
 
 export interface ProfileEducation {
