@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { useFlats } from "@/hooks/useFlats";
+import { useUpdateSearchPreferences } from "@/hooks/useProfile";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -68,9 +69,12 @@ export const HomePage = () => {
   const [animationDirection, setAnimationDirection] = useState<"left" | "right" | null>(null);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { toast } = useToast();
+  const { mutate: updateSearchPreferences } = useUpdateSearchPreferences();
 
+  const [appliedFilters, setAppliedFilters] = useState<Record<string, any>>({});
+  
   // --- Real flat profiles from API ---
-  const { data: flatsData, isLoading: flatsLoading } = useFlats();
+  const { data: flatsData, isLoading: flatsLoading } = useFlats(appliedFilters);
   const profiles = (flatsData ?? []).map(flat => ({
     id: flat.id,
     name: flat.user?.name ?? "Unknown",
@@ -996,6 +1000,38 @@ export const HomePage = () => {
                 title={flatDetailsDirty ? "Save or cancel your flat detail changes first" : undefined}
                 onClick={() => {
                   setIsFilterOpen(false);
+                  
+                  const filters: Record<string, any> = {};
+                  
+                  if (flatFilterEnabled) {
+                    if (filterCoordinates && locationRange[0]) {
+                      filters.latitude = filterCoordinates[1];
+                      filters.longitude = filterCoordinates[0];
+                      filters.radius_km = locationRange[0];
+                    }
+                    if (priceRange[0] !== 0) filters.min_rent = priceRange[0];
+                    if (priceRange[1] !== 100000) filters.max_rent = priceRange[1];
+                    if (flatTypes.length > 0) filters.flat_types = flatTypes.join(",");
+                    if (furnishingTypes.length > 0) filters.furnishing_types = furnishingTypes.join(",");
+                    if (roomTypes.length > 0) filters.room_types = roomTypes.join(",");
+                    if (availableFrom) filters.available_from = availableFrom.toISOString();
+                    if (brokerage) filters.brokerage = brokerage;
+                    if (securityDeposit) filters.security_deposit = securityDeposit;
+                    if (roomAmenities.length > 0) filters.room_amenities = roomAmenities.join(",");
+                    if (commonAreaAmenities.length > 0) filters.common_amenities = commonAreaAmenities.join(",");
+                  }
+
+                  if (flatmateFilterEnabled && flatmateProfileEnabled) {
+                     filters.age_min = flatmateAgeRange[0];
+                     if (flatmateAgeRange[1] < 60) filters.age_max = flatmateAgeRange[1];
+                     if (flatmateCompanies.length > 0) filters.companies = flatmateCompanies.join(",");
+                     if (flatmateSchools.length > 0) filters.schools = flatmateSchools.join(",");
+                     if (flatmateProfileHabits.length > 0) filters.habits = flatmateProfileHabits.join(",");
+                  }
+
+                  setAppliedFilters(filters);
+                  updateSearchPreferences(filters);
+                  
                   toast({
                     title: "Filters Applied",
                     description: "Your filters have been successfully applied.",

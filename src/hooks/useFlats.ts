@@ -33,11 +33,11 @@ export interface Flat {
   media: { media_url: string; media_type: string }[];
 }
 
-export const useFlats = () => {
+export const useFlats = (filters?: Record<string, any>) => {
   return useQuery<Flat[]>({
-    queryKey: ["flats"],
+    queryKey: ["flats", filters],
     queryFn: async () => {
-      const res = await api.get("/flats");
+      const res = await api.get("/flats", { params: filters });
       return res.data.data;
     },
     staleTime: 2 * 60 * 1000,

@@ -253,3 +253,14 @@ export const useUpdateLookingFor = () => {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["profile", "looking-for"] }),
   });
 };
+
+export const useUpdateSearchPreferences = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (preferences: Record<string, any>) => {
+      const res = await api.put("/profile/search-preferences", preferences);
+      return res.data?.data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["profile"] }),
+  });
+};
