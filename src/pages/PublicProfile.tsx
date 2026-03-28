@@ -32,9 +32,9 @@ const PublicProfile = () => {
     );
   }
 
-  const jobs = profile.job_experiences ?? [];
-  const educations = profile.education_experiences ?? [];
-  const habits = profile.user_habits ?? [];
+  const jobs = profile.workExperience ?? profile.job_experiences ?? [];
+  const educations = profile.education ?? profile.education_experiences ?? [];
+  const habits = profile.my_habits ?? profile.user_habits ?? [];
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
@@ -75,13 +75,19 @@ const PublicProfile = () => {
               <h2 className="font-semibold text-foreground flex items-center gap-2">
                 <Briefcase className="w-4 h-4" /> Work Experience
               </h2>
-              {jobs.map((j) => (
-                <div key={j.id} className="pl-2 border-l-2 border-primary/30">
-                  <p className="font-medium">{j.position_name || j.position?.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {j.company_name || j.company?.name} · {j.from_year} – {j.currently_working ? "Present" : j.till_year}
-                  </p>
-                </div>
+              {jobs.map((j, idx) => (
+                typeof j === 'string' ? (
+                  <div key={idx} className="pl-2 border-l-2 border-primary/30">
+                    <p className="font-medium">{j}</p>
+                  </div>
+                ) : (
+                  <div key={j.id} className="pl-2 border-l-2 border-primary/30">
+                    <p className="font-medium">{j.position_name || j.position?.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {j.company_name || j.company?.name} · {j.from_year} – {j.currently_working ? "Present" : j.till_year}
+                    </p>
+                  </div>
+                )
               ))}
             </CardContent>
           </Card>
@@ -94,13 +100,19 @@ const PublicProfile = () => {
               <h2 className="font-semibold text-foreground flex items-center gap-2">
                 <BookOpen className="w-4 h-4" /> Education
               </h2>
-              {educations.map((e) => (
-                <div key={e.id} className="pl-2 border-l-2 border-primary/30">
-                  <p className="font-medium">{e.degree_name || e.degree?.common_name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {e.institution_name || e.institution?.name} · {e.start_year} – {e.end_year}
-                  </p>
-                </div>
+              {educations.map((e, idx) => (
+                typeof e === 'string' ? (
+                  <div key={idx} className="pl-2 border-l-2 border-primary/30">
+                    <p className="font-medium">{e}</p>
+                  </div>
+                ) : (
+                  <div key={e.id} className="pl-2 border-l-2 border-primary/30">
+                    <p className="font-medium">{e.degree_name || e.degree?.common_name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {e.institution_name || e.institution?.name} · {e.start_year} – {e.end_year}
+                    </p>
+                  </div>
+                )
               ))}
             </CardContent>
           </Card>
@@ -112,8 +124,12 @@ const PublicProfile = () => {
             <CardContent className="pt-6 space-y-3">
               <h2 className="font-semibold text-foreground">Lifestyle</h2>
               <div className="flex flex-wrap gap-2">
-                {habits.map((h) => (
-                  <Badge key={h.id} variant="secondary">{h.habit.label}</Badge>
+                {habits.map((h, idx) => (
+                  typeof h === 'string' ? (
+                    <Badge key={idx} variant="secondary">{h}</Badge>
+                  ) : (
+                    <Badge key={h.id} variant="secondary">{h.habit.label}</Badge>
+                  )
                 ))}
               </div>
             </CardContent>

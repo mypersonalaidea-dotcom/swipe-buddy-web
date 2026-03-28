@@ -81,13 +81,13 @@ export const HomePage = () => {
     age: flat.user?.age ?? 0,
     city: flat.city ?? "Unknown",
     state: flat.state ?? "",
-    gender: "",
+    gender: flat.user?.gender ?? "",
     profilePicture: flat.user?.profile_picture_url ?? "",
     searchType: "flatmate" as const,
-    myHabits: [] as string[],
+    myHabits: flat.user?.user_habits ?? [],
     lookingForHabits: [] as string[],
-    jobExperiences: [] as { id: string; company: string; position: string; fromYear: string; tillYear: string; currentlyWorking: boolean }[],
-    educationExperiences: [] as { id: string; institution: string; degree: string; startYear: string; endYear: string }[],
+    jobExperiences: flat.user?.workExperience ?? [],
+    educationExperiences: flat.user?.education ?? [],
     flatDetails: {
       address: flat.address ?? "",
       coordinates: flat.latitude && flat.longitude

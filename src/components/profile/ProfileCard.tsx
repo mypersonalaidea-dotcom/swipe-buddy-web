@@ -57,8 +57,10 @@ export interface Profile {
   searchType: "flat" | "flatmate";
   myHabits: string[];
   lookingForHabits: string[];
-  jobExperiences: JobExperience[];
-  educationExperiences: EducationExperience[];
+  jobExperiences: JobExperience[] | string[];
+  educationExperiences: EducationExperience[] | string[];
+  workExperience?: string[];
+  education?: string[];
   flatDetails?: {
     address: string;
     /** [longitude, latitude] — populated from AddressAutocomplete */
@@ -139,18 +141,22 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                   <MapPin className="w-3.5 h-3.5 text-rose-500 flex-shrink-0" />
                   {profile.city}, {profile.state}
                 </p>
-                {/* Profession & Education tags */}
+                  {/* Profession & Education tags */}
                 <div className="flex flex-wrap gap-1.5 pt-0.5">
-                  {profile.jobExperiences.length > 0 && (
+                  {(profile.jobExperiences.length > 0) && (
                     <Badge variant="outline" className="text-xs font-normal bg-white/70 border-border/60 gap-1">
                       <Briefcase className="w-3 h-3" />
-                      {profile.jobExperiences[0].position}
+                      {typeof profile.jobExperiences[0] === 'string' 
+                        ? profile.jobExperiences[0] 
+                        : profile.jobExperiences[0].position}
                     </Badge>
                   )}
-                  {profile.educationExperiences.length > 0 && (
+                  {(profile.educationExperiences.length > 0) && (
                     <Badge variant="outline" className="text-xs font-normal bg-white/70 border-border/60 gap-1">
                       <GraduationCap className="w-3 h-3" />
-                      {profile.educationExperiences[0].institution}
+                      {typeof profile.educationExperiences[0] === 'string' 
+                        ? profile.educationExperiences[0] 
+                        : profile.educationExperiences[0].institution}
                     </Badge>
                   )}
                 </div>
@@ -513,18 +519,24 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
             <p className="text-sm text-muted-foreground">No work experience added</p>
           ) : (
             <div className="space-y-3">
-              {profile.jobExperiences.map((experience) => (
-                <div key={experience.id} className="border rounded-lg p-4 space-y-2 bg-muted/30">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-1">
-                      <h4 className="font-semibold text-foreground">{experience.position}</h4>
-                      <p className="text-sm text-muted-foreground">{experience.company}</p>
-                    </div>
+              {profile.jobExperiences.map((experience, idx) => (
+                typeof experience === 'string' ? (
+                  <div key={idx} className="border rounded-lg p-3 space-y-1 bg-muted/30">
+                    <p className="text-sm font-medium text-foreground">{experience}</p>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {experience.fromYear} - {experience.currentlyWorking ? 'Present' : experience.tillYear}
-                  </p>
-                </div>
+                ) : (
+                  <div key={experience.id} className="border rounded-lg p-4 space-y-2 bg-muted/30">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-1">
+                        <h4 className="font-semibold text-foreground">{experience.position}</h4>
+                        <p className="text-sm text-muted-foreground">{experience.company}</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {experience.fromYear} - {experience.currentlyWorking ? 'Present' : experience.tillYear}
+                    </p>
+                  </div>
+                )
               ))}
             </div>
           )}
@@ -540,16 +552,22 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
             <p className="text-sm text-muted-foreground">No education added</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {profile.educationExperiences.map((education) => (
-                <div key={education.id} className="border rounded-lg p-4 space-y-2 bg-muted/30">
-                  <div className="space-y-1">
-                    <h4 className="font-semibold text-foreground">{education.degree}</h4>
-                    <p className="text-sm text-muted-foreground">{education.institution}</p>
+              {profile.educationExperiences.map((education, idx) => (
+                typeof education === 'string' ? (
+                  <div key={idx} className="border rounded-lg p-3 space-y-1 bg-muted/30">
+                    <p className="text-sm font-medium text-foreground">{education}</p>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {education.startYear} - {education.endYear}
-                  </p>
-                </div>
+                ) : (
+                  <div key={education.id} className="border rounded-lg p-4 space-y-2 bg-muted/30">
+                    <div className="space-y-1">
+                      <h4 className="font-semibold text-foreground">{education.degree}</h4>
+                      <p className="text-sm text-muted-foreground">{education.institution}</p>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {education.startYear} - {education.endYear}
+                    </p>
+                  </div>
+                )
               ))}
             </div>
           )}

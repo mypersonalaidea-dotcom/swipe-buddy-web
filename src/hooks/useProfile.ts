@@ -52,8 +52,11 @@ export interface UserProfile {
   profile_picture_url?: string | null;
   job_experiences?: ProfileJob[];
   education_experiences?: ProfileEducation[];
-  user_habits?: ProfileHabit[];
-  looking_for_habits?: ProfileHabit[];
+  user_habits?: ProfileHabit[] | string[];
+  looking_for_habits?: ProfileHabit[] | string[];
+  workExperience?: string[];
+  education?: string[];
+  my_habits?: string[];
   flats?: Flat[];
 }
 
