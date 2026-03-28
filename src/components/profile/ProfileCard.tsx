@@ -3,13 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { MapPin, Briefcase, GraduationCap, Home, Send, Bookmark, MoreVertical, Flag, ShieldOff, ExternalLink, ChevronDown, ChevronUp, DoorOpen, Calendar, IndianRupee } from "lucide-react";
+import { MapPin, Briefcase, GraduationCap, Home, Send, Heart, MoreVertical, Flag, ShieldOff, ExternalLink, ChevronDown, ChevronUp, DoorOpen, Calendar, IndianRupee } from "lucide-react";
 import { MAPBOX_TOKEN, GOOGLE_MAPS_API_KEY, MAP_PROVIDER } from "@/lib/maps/config";
 import { GoogleMapRenderer } from "@/components/map/GoogleMapRenderer";
 import { MapboxMapRenderer } from "@/components/map/MapboxMapRenderer";
 import { getHabitIcon } from "@/constants/habits";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useSaveProfile } from "@/hooks/useSocial";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -102,15 +103,24 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
     // TODO: Implement actual message sending
   };
 
-  const handleSaveProfile = () => {
+  const { mutate: toggleSaveMutation, isPending } = useSaveProfile();
+
+  const handleSaveProfile = (e: React.MouseEvent) => {
+    e.stopPropagation();
     const newSavedState = !saved;
+    
+    // Toggle state immediately (Optimistic UI)
     setSaved(newSavedState);
-    onSaveProfile?.(profile.id, newSavedState);
-    toast({
-      title: newSavedState ? "Profile Saved" : "Profile Removed",
-      description: newSavedState
-        ? `${profile.name}'s profile has been saved.`
-        : `${profile.name}'s profile has been removed from saved.`,
+    
+    // Call API
+    toggleSaveMutation(profile.id, {
+      onError: () => {
+        // Rollback on error
+        setSaved(!newSavedState);
+      },
+      onSuccess: () => {
+        onSaveProfile?.(profile.id, newSavedState);
+      }
     });
   };
 
@@ -170,7 +180,7 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                   onClick={handleSaveProfile}
                   className="h-8 w-8 rounded-full hover:bg-white/60"
                 >
-                  <Bookmark className={`h-4 w-4 ${saved ? "fill-primary text-primary" : "text-muted-foreground"}`} />
+                  <Heart className={`h-4 w-4 transition-all duration-300 ${saved ? "fill-rose-500 text-rose-500 scale-110" : "text-muted-foreground"}`} />
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

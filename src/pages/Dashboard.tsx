@@ -9,7 +9,9 @@ import { HelpPage } from "@/components/dashboard/HelpPage";
 import { ProfileCard } from "@/components/profile/ProfileCard";
 import { mockProfiles } from "@/data/mockProfiles";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, MoreVertical, Bookmark, Flag, Copy, Check } from "lucide-react";
+import { ArrowLeft, MoreVertical, Heart, Flag, Copy, Check } from "lucide-react";
+import { useSavedProfiles, useSaveProfile } from "@/hooks/useSocial";
+import { usePublicProfile } from "@/hooks/useProfile";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,28 +25,23 @@ export type DashboardView = "home" | "messages" | "profile" | "help";
 const Dashboard = () => {
   const [activeView, setActiveView] = useState<DashboardView>("home");
   const [searchParams, setSearchParams] = useSearchParams();
-  const [savedProfileIds, setSavedProfileIds] = useState<string[]>(["1", "3"]);
   const [isCopied, setIsCopied] = useState(false);
+  const { data: savedProfiles = [] } = useSavedProfiles();
+  const { mutate: toggleSaveMutation } = useSaveProfile();
   const { toast } = useToast();
   
   const profileId = searchParams.get("profile");
   const fromSource = searchParams.get("from");
 
-  const selectedProfile = profileId 
-    ? mockProfiles.find(p => p.id === profileId) 
-    : null;
+  // Fetch profile if selected, but fall back to mock if needed for now
+  const { data: apiProfile } = usePublicProfile(profileId || undefined);
+  const selectedProfile = apiProfile || (profileId ? mockProfiles.find(p => p.id === profileId) : null);
 
-  const isProfileSaved = profileId ? savedProfileIds.includes(profileId) : false;
+  const isProfileSaved = profileId ? savedProfiles.some(p => p.id === profileId) : false;
 
   const handleSaveProfile = () => {
     if (!profileId) return;
-    if (isProfileSaved) {
-      setSavedProfileIds(prev => prev.filter(id => id !== profileId));
-      toast({ title: "Profile removed from saved" });
-    } else {
-      setSavedProfileIds(prev => [...prev, profileId]);
-      toast({ title: "Profile saved!" });
-    }
+    toggleSaveMutation(profileId);
   };
 
   const handleReportProfile = () => {
@@ -96,7 +93,7 @@ const Dashboard = () => {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-popover">
                 <DropdownMenuItem onClick={handleSaveProfile}>
-                  <Bookmark className={`h-4 w-4 mr-2 ${isProfileSaved ? "fill-current" : ""}`} />
+                  <Heart className={`h-4 w-4 mr-2 ${isProfileSaved ? "fill-rose-500 text-rose-500" : ""}`} />
                   {isProfileSaved ? "Unsave Profile" : "Save Profile"}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleReportProfile}>
@@ -115,7 +112,7 @@ const Dashboard = () => {
             </DropdownMenu>
           </div>
           <div className="flex-1 flex items-center justify-center">
-            <ProfileCard profile={selectedProfile} />
+            <ProfileCard profile={selectedProfile as any} isSaved={isProfileSaved} />
           </div>
         </div>
       );

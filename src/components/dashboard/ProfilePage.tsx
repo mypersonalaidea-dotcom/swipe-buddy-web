@@ -37,6 +37,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useFlats, useUpdateFlat } from "@/hooks/useFlats";
 import { useCompanies, usePositions, useInstitutions, useDegrees } from "@/hooks/useMasterData";
+import { useSavedProfiles, useSaveProfile } from "@/hooks/useSocial";
 
 interface JobExperience {
   id: string;
@@ -145,6 +146,8 @@ export const ProfilePage = () => {
   const deleteEduMutation = useDeleteEducation();
   const updateHabitsMutation = useUpdateHabits();
   const updateFlatMutation = useUpdateFlat();
+  const { data: realSavedProfiles, isLoading: savedProfilesLoading } = useSavedProfiles();
+  const { mutate: toggleSaveMutation } = useSaveProfile();
 
   // ---- Master data hooks ----
   const { data: masterCompanies = [] } = useCompanies();
@@ -332,14 +335,11 @@ export const ProfilePage = () => {
     }
   };
 
-  const savedProfiles = mockProfiles.filter(p => savedProfileIds.includes(p.id));
+  // Use real saved profiles from API instead of mock
+  const savedProfiles = realSavedProfiles || [];
 
   const handleUnsaveProfile = (profileId: string) => {
-    setSavedProfileIds(prev => prev.filter(id => id !== profileId));
-    toast({
-      title: "Profile Removed",
-      description: "Profile has been removed from saved.",
-    });
+    toggleSaveMutation(profileId);
   };
 
   const currentYear = new Date().getFullYear();
@@ -1581,25 +1581,34 @@ export const ProfilePage = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {savedProfiles.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Bookmark className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-                    <p className="text-muted-foreground">No saved profiles yet</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Save profiles you're interested in by clicking the bookmark icon
-                    </p>
+                {savedProfilesLoading ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-3">
+                    <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                    <p className="text-muted-foreground animate-pulse">Loading saved profiles...</p>
+                  </div>
+                ) : savedProfiles.length === 0 ? (
+                  <div className="text-center py-12 space-y-3">
+                    <Bookmark className="w-12 h-12 text-muted-foreground/30 mx-auto" />
+                    <div className="space-y-1">
+                      <p className="text-lg font-medium text-foreground">No saved profiles yet</p>
+                      <p className="text-muted-foreground text-sm max-w-[250px] mx-auto">
+                        Found someone interesting? Click the heart icon on their card to save them here!
+                      </p>
+                    </div>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {savedProfiles.map((savedProfile) => (
+                    {savedProfiles.map((savedProfile: any) => (
                       <div
                         key={savedProfile.id}
-                        className="border rounded-lg p-4 space-y-3 bg-accent/20 hover:bg-accent/30 transition-colors cursor-pointer"
-                        onClick={() => setSearchParams({ profile: savedProfile.id, from: "saved" })}
+                        className="flex flex-col gap-4 border border-border/50 rounded-xl p-4 hover:shadow-md transition-all bg-card/50 cursor-pointer"
+                        onClick={() => {
+                          setSearchParams({ profile: savedProfile.id, from: 'saved' });
+                        }}
                       >
                         <div className="flex items-center gap-3">
                           <img
-                            src={savedProfile.profilePicture}
+                            src={savedProfile.profile_picture_url || "/placeholder.svg"}
                             alt={savedProfile.name}
                             className="w-14 h-14 rounded-full object-cover border-2 border-primary/20"
                           />
@@ -1609,10 +1618,10 @@ export const ProfilePage = () => {
                               {savedProfile.age} years • {savedProfile.city}, {savedProfile.state}
                             </p>
                             <Badge
-                              variant={savedProfile.searchType === "flatmate" ? "default" : "secondary"}
+                              variant={savedProfile.search_type === "flatmate" ? "default" : "secondary"}
                               className="text-xs mt-1"
                             >
-                              {savedProfile.searchType === "flatmate" ? "Has Flat" : "Looking for Flat"}
+                              {savedProfile.search_type === "flatmate" ? "Has Flat" : "Looking for Flat"}
                             </Badge>
                           </div>
                           <Button
@@ -1628,15 +1637,19 @@ export const ProfilePage = () => {
                           </Button>
                         </div>
                         <div className="flex flex-wrap gap-1">
-                          {savedProfile.myHabits.slice(0, 3).map((habit) => (
-                            <Badge key={habit} variant="outline" className="text-xs">
-                              {habit}
-                            </Badge>
-                          ))}
-                          {savedProfile.myHabits.length > 3 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{savedProfile.myHabits.length - 3} more
-                            </Badge>
+                          {savedProfile.user_habits && Array.isArray(savedProfile.user_habits) && (
+                            <>
+                              {savedProfile.user_habits.slice(0, 3).map((habit: any) => (
+                                <Badge key={habit.habit.label} variant="outline" className="text-xs">
+                                  {habit.habit.label}
+                                </Badge>
+                              ))}
+                              {savedProfile.user_habits.length > 3 && (
+                                <Badge variant="outline" className="text-xs">
+                                  +{savedProfile.user_habits.length - 3} more
+                                </Badge>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
