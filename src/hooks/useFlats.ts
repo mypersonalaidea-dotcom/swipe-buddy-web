@@ -11,7 +11,7 @@ export interface FlatRoom {
   available_count: number;
   available_from: string | null;
   furnishing_type?: string;
-  room_amenities: { amenity: { name: string; icon_name: string } }[];
+  room_amenities: string[];
   media: { media_url: string; media_type: string }[];
 }
 
@@ -29,7 +29,7 @@ export interface Flat {
   is_published: boolean;
   user: { id: string; name: string; age?: number; profile_picture_url: string | null };
   rooms: FlatRoom[];
-  common_amenities: { amenity: { name: string; icon_name: string } }[];
+  common_amenities: string[];
   media: { media_url: string; media_type: string }[];
 }
 

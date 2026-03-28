@@ -181,7 +181,7 @@ export const ProfilePage = () => {
               r.security_deposit != null ? String(r.security_deposit) : "",
             brokerage: r.brokerage != null ? String(r.brokerage) : "",
             availableFrom: r.available_from ?? "",
-            amenities: (r.room_amenities ?? []).map((a) => a.amenity.name),
+            amenities: r.room_amenities ?? [],
             media: (r.media ?? []).map((m, i) => ({
               id: `room-media-${i}`,
               file: null as unknown as File,
@@ -191,9 +191,7 @@ export const ProfilePage = () => {
                 | "video",
             })),
           })),
-          commonAmenities: (apiFlat.common_amenities ?? []).map(
-            (a) => a.amenity.name
-          ),
+          commonAmenities: apiFlat.common_amenities ?? [],
           description: apiFlat.description ?? "",
           commonMedia: (apiFlat.media ?? []).map((m, i) => ({
             id: `common-media-${i}`,
