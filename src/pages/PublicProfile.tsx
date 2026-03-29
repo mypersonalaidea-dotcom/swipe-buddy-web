@@ -21,9 +21,11 @@ const PublicProfile = () => {
 
   if (isError || !profile) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
-        <h1 className="text-2xl font-bold text-foreground mb-4">Profile Not Found</h1>
-        <p className="text-muted-foreground mb-6">The profile you're looking for doesn't exist.</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4 text-center">
+        <h1 className="text-2xl font-bold text-foreground mb-2">Profile Not Found</h1>
+        <p className="text-muted-foreground mb-6 max-w-md">
+          {isError ? "There was an error loading this profile. It might be private or the link may have expired." : "The profile you're looking for doesn't exist."}
+        </p>
         <Button onClick={() => navigate("/dashboard")}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Go Back
@@ -32,9 +34,9 @@ const PublicProfile = () => {
     );
   }
 
-  const jobs = profile.workExperience ?? profile.job_experiences ?? [];
-  const educations = profile.education ?? profile.education_experiences ?? [];
-  const habits = profile.my_habits ?? profile.user_habits ?? [];
+  const jobs = profile.workExperience || profile.job_experiences || [];
+  const educations = profile.education || profile.education_experiences || [];
+  const habits = profile.my_habits || profile.user_habits || [];
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
@@ -125,11 +127,11 @@ const PublicProfile = () => {
               <h2 className="font-semibold text-foreground">Lifestyle</h2>
               <div className="flex flex-wrap gap-2">
                 {habits.map((h, idx) => (
-                  typeof h === 'string' ? (
+                  (typeof h !== 'string' && h?.habit) ? (
+                    <Badge key={h.id || idx} variant="secondary">{h.habit.label}</Badge>
+                  ) : typeof h === 'string' ? (
                     <Badge key={idx} variant="secondary">{h}</Badge>
-                  ) : (
-                    <Badge key={h.id} variant="secondary">{h.habit.label}</Badge>
-                  )
+                  ) : null
                 ))}
               </div>
             </CardContent>

@@ -78,8 +78,16 @@ export const usePublicProfile = (id: string | undefined) => {
   return useQuery<UserProfile>({
     queryKey: ["profile", id],
     queryFn: async () => {
-      const res = await api.get(`/profile/${id}`);
-      return res.data.data;
+      try {
+        console.log(`[usePublicProfile] Fetching profile for ID: ${id}`);
+        const res = await api.get(`/profile/${id}`);
+        console.log("[usePublicProfile] API Response:", res.data);
+        // Backend usually returns { success: true, data: { ...profile... } }
+        return res.data.data || res.data; 
+      } catch (err: any) {
+        console.error(`[usePublicProfile] Error fetching profile ${id}:`, err?.response?.data || err.message);
+        throw err;
+      }
     },
     enabled: !!id,
   });
