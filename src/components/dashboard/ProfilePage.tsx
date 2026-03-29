@@ -23,16 +23,17 @@ import {
 } from "@/components/ui/dialog";
 import {
   User, Phone, Mail, Briefcase, BookOpen, Home, MapPin,
-  Edit2, Save, X, Plus, Trash2, Camera, Heart, Bookmark, Share2, Copy, Check, DoorOpen, Building2, Loader2
+  Edit2, Save, X, Plus, Trash2, Camera, Heart, Bookmark, Share2, Copy, Check, DoorOpen, Building2, Loader2, Calendar
 } from "lucide-react";
 import { MediaUpload } from "@/components/ui/media-upload";
+import { MapPicker } from "@/components/map/MapPicker";
 import { mockProfiles } from "@/data/mockProfiles";
 import { Profile } from "@/components/profile/ProfileCard";
 import {
   useMyProfile, useUpdateProfile,
   useMyJobs, useAddJob, useUpdateJob, useDeleteJob,
   useMyEducation, useAddEducation, useUpdateEducation, useDeleteEducation,
-  useMyHabits, useUpdateHabits,
+  useMyHabits, useUpdateHabits, useUpdateSearchPreferences
 } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFlats, useUpdateFlat } from "@/hooks/useFlats";
@@ -90,8 +91,15 @@ interface UserProfile {
   educationExperiences: EducationExperience[];
   // Housing Details
   searchType: "flat" | "flatmate" | "both";
+  propertyMoveInDate?: string;
+  searchLocation?: string;
+  searchCoordinates?: [number, number];
+  searchRadius?: number;
   flatDetails: {
     address: string;
+    coordinates?: [number, number];
+    city: string;
+    state: string;
     flatType: string;
     flatFurnishing: string;
     rooms: RoomDetails[];
@@ -109,7 +117,10 @@ const emptyProfile: UserProfile = {
   city: "", state: "", profilePictureUrl: "",
   jobExperiences: [], educationExperiences: [],
   searchType: "flat",
-  flatDetails: { address: "", flatType: "", flatFurnishing: "", rooms: [], commonAmenities: [], description: "", commonMedia: [] },
+  propertyMoveInDate: new Date().toISOString().split('T')[0],
+  searchLocation: "",
+  searchRadius: 5,
+  flatDetails: { address: "", city: "", state: "", flatType: "", flatFurnishing: "", rooms: [], commonAmenities: [], description: "", commonMedia: [] },
   myHabits: []
 };
 
@@ -146,6 +157,7 @@ export const ProfilePage = () => {
   const deleteEduMutation = useDeleteEducation();
   const updateHabitsMutation = useUpdateHabits();
   const updateFlatMutation = useUpdateFlat();
+  const updateSearchPrefsMutation = useUpdateSearchPreferences();
   const { data: realSavedProfiles, isLoading: savedProfilesLoading } = useSavedProfiles();
   const { mutate: toggleSaveMutation } = useSaveProfile();
 
@@ -172,6 +184,9 @@ export const ProfilePage = () => {
     const flatDetails = apiFlat
       ? {
           address: apiFlat.address ?? "",
+          coordinates: (apiFlat.longitude != null && apiFlat.latitude != null) ? [Number(apiFlat.longitude), Number(apiFlat.latitude)] as [number, number] : undefined,
+          city: apiFlat.city ?? "",
+          state: apiFlat.state ?? "",
           flatType: apiFlat.flat_type ?? "",
           flatFurnishing: furnishingReverseMap[apiFlat.furnishing_type] ?? "",
           rooms: (apiFlat.rooms ?? []).map((r) => ({
@@ -207,6 +222,8 @@ export const ProfilePage = () => {
         }
       : {
           address: "",
+          city: "",
+          state: "",
           flatType: "",
           flatFurnishing: "",
           rooms: [],
@@ -243,6 +260,9 @@ export const ProfilePage = () => {
         | "flat"
         | "flatmate"
         | "both",
+      propertyMoveInDate: apiProfile?.move_in_date ?? new Date().toISOString().split('T')[0],
+      searchLocation: apiProfile?.search_location ?? "",
+      searchRadius: apiProfile?.search_radius ?? 5,
       flatDetails,
       myHabits: (apiHabits ?? []).map((h) => h.habit.label),
     };
@@ -366,6 +386,7 @@ export const ProfilePage = () => {
         city: editedProfile.city,
         state: editedProfile.state,
         search_type: editedProfile.searchType as any,
+        move_in_date: editedProfile.propertyMoveInDate || undefined,
       });
 
       // 2. Sync jobs: delete removed, update existing, add new
@@ -444,10 +465,14 @@ export const ProfilePage = () => {
         await updateFlatMutation.mutateAsync({
           id: apiFlat.id,
           address: flatDetails.address,
+          city: flatDetails.city || undefined,
+          state: flatDetails.state || undefined,
           flat_type: flatDetails.flatType || undefined,
           furnishing_type: furnishingMap[flatDetails.flatFurnishing] || "unfurnished",
           description: flatDetails.description || undefined,
           is_published: true,
+          latitude: flatDetails.coordinates ? String(flatDetails.coordinates[1]) : undefined,
+          longitude: flatDetails.coordinates ? String(flatDetails.coordinates[0]) : undefined,
           // Sync rooms
           rooms: flatDetails.rooms.map((r, idx) => ({
             id: r.id.startsWith('profile-') || isNaN(Number(r.id)) ? undefined : r.id,
@@ -464,6 +489,14 @@ export const ProfilePage = () => {
           })),
           common_amenities: flatDetails.commonAmenities || [],
           media: (flatDetails.commonMedia || []).map(m => ({ media_url: m.url, media_type: m.type })),
+        });
+      }
+
+      // 4.5 Sync search preferences (for seekers)
+      if ((editedProfile.searchType === 'flat' || editedProfile.searchType === 'both') && editedProfile.searchLocation) {
+        await updateSearchPrefsMutation.mutateAsync({
+          location_search: editedProfile.searchLocation,
+          location_range_km: editedProfile.searchRadius ?? 5,
         });
       }
 
@@ -1104,6 +1137,86 @@ export const ProfilePage = () => {
               </CardContent>
             </Card >
 
+            {/* Looking for Flat — shown for flat seekers, same as signup */}
+            {(data.searchType === "flat" || data.searchType === "both") && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Home className="w-5 h-5" />
+                    Looking for Flat
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      Property Move-in Date
+                    </Label>
+                    {isEditing ? (
+                      <Input
+                        type="date"
+                        className="w-fit"
+                        value={data.propertyMoveInDate || ''}
+                        onChange={(e) => updateField('propertyMoveInDate', e.target.value)}
+                      />
+                    ) : (
+                      <p className="text-foreground p-2 bg-muted/30 rounded-md">
+                        {data.propertyMoveInDate ? new Date(data.propertyMoveInDate).toLocaleDateString() : 'Not set'}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Preferred Search Area with Map */}
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4" />
+                      Preferred Search Area
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      {isEditing ? 'Select the area where you\'re looking for a flat and adjust the search radius' : 'Selected area for search'}
+                    </p>
+                    {isEditing ? (
+                      <MapPicker
+                        showRadius
+                        radius={data.searchRadius ?? 5}
+                        location={data.searchLocation}
+                        coordinates={data.searchCoordinates}
+                        onLocationChange={(result) => {
+                          setEditedProfile({
+                            ...editedProfile,
+                            searchLocation: result.fullAddress,
+                            searchCoordinates: result.coordinates,
+                          });
+                        }}
+                        onRadiusChange={(r) => {
+                          updateField('searchRadius', r);
+                        }}
+                        height="280px"
+                      />
+                    ) : (
+                      <div className="space-y-2">
+                         <p className="text-foreground p-2 bg-muted/30 rounded-md">
+                          {data.searchLocation || 'No location selected'} (Radius: {data.searchRadius}km)
+                        </p>
+                        {data.searchCoordinates && (
+                          <div className="h-[200px] rounded-md overflow-hidden border">
+                            <MapPicker
+                              disabled
+                              location={data.searchLocation}
+                              coordinates={data.searchCoordinates}
+                              radius={data.searchRadius}
+                              showRadius
+                              height="200px"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Flat Details — shown for flatmate seekers, same as signup */}
             {
               (data.searchType === 'flatmate' || data.searchType === 'both') && (
@@ -1115,19 +1228,69 @@ export const ProfilePage = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    {/* Address */}
+                    {/* Address & Map */}
                     <div className="space-y-2">
                       <Label className="flex items-center gap-1">
                         <MapPin className="w-4 h-4" /> Flat Address
                       </Label>
                       {isEditing ? (
-                        <Input
-                          value={data.flatDetails.address}
-                          onChange={(e) => updateField('flatDetails', { ...editedProfile.flatDetails, address: e.target.value })}
-                          placeholder="123 Main St, City"
-                        />
+                        <div className="space-y-4">
+                          <MapPicker
+                            location={data.flatDetails.address}
+                            coordinates={data.flatDetails.coordinates}
+                            onLocationChange={(result) => {
+                              setEditedProfile({
+                                ...editedProfile,
+                                flatDetails: {
+                                  ...editedProfile.flatDetails,
+                                  address: result.fullAddress,
+                                  coordinates: result.coordinates,
+                                  city: result.components.locality ?? editedProfile.flatDetails.city,
+                                  state: result.components.state ?? editedProfile.flatDetails.state,
+                                },
+                                // Also update top-level city/state for overall consistency
+                                city: result.components.locality ?? editedProfile.city,
+                                state: result.components.state ?? editedProfile.state,
+                              });
+                            }}
+                            height="240px"
+                          />
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>City</Label>
+                              <Input
+                                placeholder="e.g. Gurugram"
+                                value={data.flatDetails.city}
+                                onChange={(e) => updateField('flatDetails', { ...editedProfile.flatDetails, city: e.target.value })}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>State</Label>
+                              <Input
+                                placeholder="e.g. Haryana"
+                                value={data.flatDetails.state}
+                                onChange={(e) => updateField('flatDetails', { ...editedProfile.flatDetails, state: e.target.value })}
+                              />
+                            </div>
+                          </div>
+                        </div>
                       ) : (
-                        <p className="text-foreground p-2 bg-muted/30 rounded-md">{data.flatDetails.address || 'Not provided'}</p>
+                        <div className="space-y-2">
+                          <p className="text-foreground p-2 bg-muted/30 rounded-md">
+                            {data.flatDetails.address || 'Not provided'}
+                            {(data.flatDetails.city || data.flatDetails.state) && ` (${[data.flatDetails.city, data.flatDetails.state].filter(Boolean).join(', ')})`}
+                          </p>
+                          {data.flatDetails.coordinates && (
+                            <div className="h-[200px] rounded-md overflow-hidden border">
+                              <MapPicker
+                                disabled
+                                location={data.flatDetails.address}
+                                coordinates={data.flatDetails.coordinates}
+                                height="200px"
+                              />
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
 

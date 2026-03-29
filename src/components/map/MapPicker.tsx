@@ -52,6 +52,7 @@ export function MapPicker({
   onLocationChange,
   onRadiusChange,
   className,
+  disabled = false,
 }: MapPickerProps) {
   const activeProvider = provider ?? MAP_PROVIDER;
   const maps = useMaps(activeProvider);
@@ -65,23 +66,25 @@ export function MapPicker({
 
   const handleLocationSelected = useCallback(
     (result: GeocodeResult) => {
+      if (disabled) return;
       setCenter(result.coordinates);
       setSelectedResult(result);
-      onLocationChange(result);
+      onLocationChange?.(result);
     },
-    [onLocationChange],
+    [onLocationChange, disabled],
   );
 
   const handleRadiusChange = useCallback(
     (newRadius: number) => {
+      if (disabled) return;
       setRadius(newRadius);
       onRadiusChange?.(newRadius);
     },
-    [onRadiusChange],
+    [onRadiusChange, disabled],
   );
 
   const handleUseMyLocation = () => {
-    if (!navigator.geolocation) return;
+    if (disabled || !navigator.geolocation) return;
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
@@ -109,30 +112,32 @@ export function MapPicker({
   return (
     <div className={cn('space-y-3', className)}>
       {/* ── Search bar + Use my location ─────────────────────── */}
-      <div className="flex gap-2">
-        <AddressAutocomplete
-          provider={activeProvider}
-          value={location}
-          placeholder="Search for an address..."
-          onSelect={handleLocationSelected}
-          className="flex-1"
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          onClick={handleUseMyLocation}
-          disabled={isLocating}
-          title="Use my current location"
-          className="shrink-0"
-        >
-          {isLocating ? (
-            <Navigation className="w-4 h-4 animate-pulse" />
-          ) : (
-            <Locate className="w-4 h-4" />
-          )}
-        </Button>
-      </div>
+      {!disabled && (
+        <div className="flex gap-2">
+          <AddressAutocomplete
+            provider={activeProvider}
+            value={location}
+            placeholder="Search for an address..."
+            onSelect={handleLocationSelected}
+            className="flex-1"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={handleUseMyLocation}
+            disabled={isLocating}
+            title="Use my current location"
+            className="shrink-0"
+          >
+            {isLocating ? (
+              <Navigation className="w-4 h-4 animate-pulse" />
+            ) : (
+              <Locate className="w-4 h-4" />
+            )}
+          </Button>
+        </div>
+      )}
 
       {/* ── Map ──────────────────────────────────────────────── */}
       <div className="relative">

@@ -81,8 +81,10 @@ export interface MapPickerProps extends MapComponentProps {
   showRadius?: boolean;
   /** Whether to show the search/geocoder input on the map */
   showSearch?: boolean;
+  /** Whether the map is in read-only mode */
+  disabled?: boolean;
   /** Called when the user selects a location */
-  onLocationChange: (result: GeocodeResult) => void;
+  onLocationChange?: (result: GeocodeResult) => void;
   /** Called when radius slider changes */
   onRadiusChange?: (radius: number) => void;
 }
