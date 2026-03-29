@@ -12,6 +12,7 @@ export interface FlatRoom {
   available_from: string | null;
   furnishing_type?: string;
   room_amenities: string[];
+  photos: string[];
   media: { media_url: string; media_type: string }[];
 }
 
@@ -22,8 +23,8 @@ export interface Flat {
   state: string;
   user_id: string;
   pincode?: string;
-  latitude?: string | null;
-  longitude?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   furnishing_type: string;
   flat_type?: string | null;
   description?: string;
@@ -40,6 +41,7 @@ export interface Flat {
   };
   rooms: FlatRoom[];
   common_amenities: string[];
+  photos: string[];
   media: { media_url: string; media_type: string }[];
 }
 

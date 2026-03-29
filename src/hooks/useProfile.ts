@@ -13,7 +13,7 @@ export interface ProfileJob {
   till_year: string | null;
   currently_working: boolean;
   display_order: number;
-  company: { id: string; name: string; logo_url: string | null } | null;
+  company: { id: string; name: string; website?: string; logo_url: string | null } | null;
   position: { id: string; full_name: string; common_name: string } | null;
 }
 
@@ -24,7 +24,7 @@ export interface ProfileEducation {
   start_year: string | null;
   end_year: string | null;
   display_order: number;
-  institution: { id: string; name: string } | null;
+  institution: { id: string; name: string; logo_url?: string | null } | null;
   degree: { id: string; common_name: string } | null;
 }
 
@@ -38,6 +38,20 @@ export interface ProfileHabit {
   };
 }
 
+export interface SearchPreferences {
+  id: string;
+  flat_filter_enabled: boolean;
+  min_rent: number;
+  max_rent: number;
+  flat_types: string[];
+  furnishing_types: string[];
+  habits: string[];
+  age_min: number;
+  age_max: number;
+  location_search?: string;
+  location_range_km?: number;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -49,7 +63,13 @@ export interface UserProfile {
   state?: string;
   search_type?: "flat" | "flatmate" | "both";
   is_published?: boolean;
+  phone_verified?: boolean;
+  email_verified?: boolean;
+  status?: string;
+  created_at?: string;
+  updated_at?: string;
   profile_picture_url?: string | null;
+  search_preferences?: SearchPreferences;
   job_experiences?: ProfileJob[];
   education_experiences?: ProfileEducation[];
   user_habits?: ProfileHabit[] | string[];

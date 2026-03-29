@@ -25,6 +25,8 @@ interface JobExperience {
   fromYear: string;
   tillYear: string;
   currentlyWorking: boolean;
+  companyLogo?: string;
+  companyWebsite?: string;
 }
 
 interface EducationExperience {
@@ -33,6 +35,7 @@ interface EducationExperience {
   degree: string;
   startYear: string;
   endYear: string;
+  institutionLogo?: string;
 }
 
 interface Room {
@@ -540,11 +543,28 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                     <p className="text-sm font-medium text-foreground">{experience}</p>
                   </div>
                 ) : (
-                  <div key={experience.id} className="border rounded-lg p-4 space-y-2 bg-muted/30">
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-1">
-                        <h4 className="font-semibold text-foreground">{experience.position}</h4>
-                        <p className="text-sm text-muted-foreground">{experience.company}</p>
+                  <div key={experience.id} className="border rounded-lg p-4 space-y-3 bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      {experience.companyLogo && (
+                        <div className="w-10 h-10 rounded-md overflow-hidden bg-white border border-border flex-shrink-0">
+                          <img src={experience.companyLogo} alt={experience.company} className="w-full h-full object-contain" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="font-semibold text-foreground truncate">{experience.position}</h4>
+                          {experience.companyWebsite && (
+                            <a 
+                              href={experience.companyWebsite} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-primary hover:text-primary/80"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground truncate">{experience.company}</p>
                       </div>
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -573,10 +593,17 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                     <p className="text-sm font-medium text-foreground">{education}</p>
                   </div>
                 ) : (
-                  <div key={education.id} className="border rounded-lg p-4 space-y-2 bg-muted/30">
-                    <div className="space-y-1">
-                      <h4 className="font-semibold text-foreground">{education.degree}</h4>
-                      <p className="text-sm text-muted-foreground">{education.institution}</p>
+                  <div key={education.id} className="border rounded-lg p-4 space-y-3 bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      {education.institutionLogo && (
+                        <div className="w-10 h-10 rounded-md overflow-hidden bg-white border border-border flex-shrink-0">
+                          <img src={education.institutionLogo} alt={education.institution} className="w-full h-full object-contain" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-foreground truncate">{education.degree}</h4>
+                        <p className="text-sm text-muted-foreground truncate">{education.institution}</p>
+                      </div>
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {education.startYear} - {education.endYear}

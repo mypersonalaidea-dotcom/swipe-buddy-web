@@ -200,25 +200,35 @@ export const ProfilePage = () => {
             brokerage: r.brokerage != null ? String(r.brokerage) : "",
             availableFrom: r.available_from ?? "",
             amenities: r.room_amenities ?? [],
-            media: (r.media ?? []).map((m, i) => ({
-              id: `room-media-${i}`,
-              file: null as unknown as File,
-              url: m.media_url,
-              type: (m.media_type === "video" ? "video" : "image") as
-                | "image"
-                | "video",
-            })),
+            media: (r.media && r.media.length > 0) 
+              ? r.media.map((m, i) => ({
+                  id: `room-media-${i}`,
+                  file: null as unknown as File,
+                  url: m.media_url,
+                  type: (m.media_type === "video" ? "video" : "image") as "image" | "video",
+                }))
+              : (r.photos ?? []).map((url, i) => ({
+                  id: `room-photo-${i}`,
+                  file: null as unknown as File,
+                  url: url,
+                  type: "image" as const,
+                })),
           })),
           commonAmenities: apiFlat.common_amenities ?? [],
           description: apiFlat.description ?? "",
-          commonMedia: (apiFlat.media ?? []).map((m, i) => ({
-            id: `common-media-${i}`,
-            file: null as unknown as File,
-            url: m.media_url,
-            type: (m.media_type === "video" ? "video" : "image") as
-              | "image"
-              | "video",
-          })),
+          commonMedia: (apiFlat.media && apiFlat.media.length > 0)
+            ? apiFlat.media.map((m, i) => ({
+                id: `common-media-${i}`,
+                file: null as unknown as File,
+                url: m.media_url,
+                type: (m.media_type === "video" ? "video" : "image") as "image" | "video",
+              }))
+            : (apiFlat.photos ?? []).map((url, i) => ({
+                id: `common-photo-${i}`,
+                file: null as unknown as File,
+                url: url,
+                type: "image" as const,
+              })),
         }
       : {
           address: "",
