@@ -97,9 +97,9 @@ export interface TypingEvent {
 }
 
 export interface UserOnlineEvent {
-  userId: string;
-  isOnline: boolean;
-  lastSeenAt: string | null;
+  user_id: string;
+  is_online: boolean;
+  last_seen_at: string | null;
 }
 
 export interface ConversationUpdatedEvent {

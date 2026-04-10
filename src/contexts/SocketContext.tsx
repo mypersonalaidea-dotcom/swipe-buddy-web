@@ -46,9 +46,9 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     const onDisconnect = () => setIsConnected(false);
     
     const onUserOnline = (payload: UserOnlineEvent) => {
-      globalOnlineUsers.set(payload.userId, {
-        isOnline: payload.isOnline,
-        lastSeenAt: payload.lastSeenAt,
+      globalOnlineUsers.set(payload.user_id, {
+        isOnline: payload.is_online,
+        lastSeenAt: payload.last_seen_at,
       });
       setOnlineUsersVersion((v) => v + 1);
     };
