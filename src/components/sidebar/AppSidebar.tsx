@@ -29,6 +29,9 @@ interface AppSidebarProps {
   onViewChange: (view: DashboardView) => void;
 }
 
+import { useConversations } from "@/hooks/useMessaging";
+import { ConversationPayload } from "@/lib/types/messaging";
+
 const menuItems = [
   { id: "home" as DashboardView, label: "Home", icon: Home },
   { id: "messages" as DashboardView, label: "Messages", icon: MessageCircle },
@@ -39,7 +42,14 @@ const menuItems = [
 export const AppSidebar = ({ activeView, onViewChange }: AppSidebarProps) => {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  const { data: conversations } = useConversations();
+
+  const unreadCount = conversations?.reduce((acc: number, conv: ConversationPayload) => {
+    // Only count unread if the last message was NOT sent by me
+    const isReceivedMessage = conv.lastMessage && conv.lastMessage.senderId !== user?.id;
+    return acc + (isReceivedMessage ? conv.unreadCount : 0);
+  }, 0) || 0;
 
   const handleLogout = () => {
     logout(); // clears swipebuddy_token + swipebuddy_user from localStorage
@@ -60,7 +70,14 @@ export const AppSidebar = ({ activeView, onViewChange }: AppSidebarProps) => {
                       isActive={activeView === item.id}
                       className="!h-14 flex flex-col items-center justify-center gap-1 !overflow-visible hover:bg-sidebar-accent"
                     >
-                      <item.icon className="h-5 w-5" />
+                      <div className="relative">
+                        <item.icon className="h-5 w-5" />
+                        {item.id === "messages" && unreadCount > 0 && (
+                          <span className="absolute -top-1 -right-1 h-3.5 w-3.5 bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center rounded-full border border-background">
+                            {unreadCount > 9 ? '9+' : unreadCount}
+                          </span>
+                        )}
+                      </div>
                       <span className="text-xs">{item.label}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

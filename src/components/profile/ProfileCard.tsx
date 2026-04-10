@@ -11,6 +11,7 @@ import { getHabitIcon } from "@/constants/habits";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useSaveProfile } from "@/hooks/useSocial";
+import { useNavigate } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -106,9 +107,10 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
       : `Hey! ${profile.name}, I've got a flat vacancy. Want to know the details?`
   );
 
+  const navigate = useNavigate();
+
   const handleSendMessage = () => {
-    console.log("Sending message:", message);
-    // TODO: Implement actual message sending
+    navigate(`/dashboard?activeView=messages&newChat=${profile.id}`);
   };
 
   const { mutate: toggleSaveMutation, isPending } = useSaveProfile();
