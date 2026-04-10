@@ -155,11 +155,15 @@ export function useChat(activeConversationId: string | null) {
         if (!old) return old;
         const newPages = [...old.pages];
         if (newPages.length > 0) {
-          // Prepend to first page
-          newPages[0] = {
-            ...newPages[0],
-            messages: [payload.message, ...newPages[0].messages]
-          };
+          // Prevent doubling if message already exists (from optimistic UI + message_sent)
+          const alreadyExists = newPages.some(page => page.messages.some((m: MessagePayload) => m.id === payload.message.id));
+          if (!alreadyExists) {
+            // Prepend to first page
+            newPages[0] = {
+              ...newPages[0],
+              messages: [payload.message, ...newPages[0].messages]
+            };
+          }
         }
         return { ...old, pages: newPages };
       });
