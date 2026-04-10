@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/sidebar/AppSidebar";
@@ -23,9 +23,22 @@ import { useToast } from "@/hooks/use-toast";
 export type DashboardView = "home" | "messages" | "profile" | "help";
 
 const Dashboard = () => {
-  const [activeView, setActiveView] = useState<DashboardView>("home");
   const [searchParams, setSearchParams] = useSearchParams();
+  const activeViewParam = searchParams.get("activeView") as DashboardView;
   const [isCopied, setIsCopied] = useState(false);
+  
+  const [activeView, setActiveView] = useState<DashboardView>(
+    activeViewParam && ["home", "messages", "profile", "help"].includes(activeViewParam) 
+      ? activeViewParam 
+      : "home"
+  );
+
+  // Sync state when URL changes externally (like from ProfileCard)
+  useEffect(() => {
+    if (activeViewParam && ["home", "messages", "profile", "help"].includes(activeViewParam)) {
+      setActiveView(activeViewParam);
+    }
+  }, [activeViewParam]);
   const { data: savedProfiles = [] } = useSavedProfiles();
   const { mutate: toggleSaveMutation } = useSaveProfile();
   const { toast } = useToast();

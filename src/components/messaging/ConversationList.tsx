@@ -40,13 +40,13 @@ export function ConversationList({
   const { isUserOnline } = useSocket();
 
   const filteredConversations = conversations.filter(conv => {
-    const participant = conv.participants.find(p => p.userId !== user?.id);
+    const participant = conv.other_user;
     if (!participant) return false;
     
     const matchesSearch = participant.name.toLowerCase().includes(searchQuery.toLowerCase());
     if (!matchesSearch) return false;
     
-    if (activeFilter === "unread") return conv.unreadCount > 0;
+    if (activeFilter === "unread") return conv.unread_count > 0;
     
     return true;
   });
@@ -105,19 +105,19 @@ export function ConversationList({
             </div>
           ) : (
             filteredConversations.map((conversation) => {
-              const otherParticipant = conversation.participants.find(p => p.userId !== user?.id);
+              const otherParticipant = conversation.other_user;
               if (!otherParticipant) return null;
               
-              const isOnline = isUserOnline(otherParticipant.userId);
-              const isTyping = typingUsersByConv.get(conversation.id)?.has(otherParticipant.userId);
+              const isOnline = isUserOnline(otherParticipant.id);
+              const isTyping = typingUsersByConv.get(conversation.id)?.has(otherParticipant.id);
               
               // Formatting time
-              const lastActivity = conversation.lastMessage?.createdAt || conversation.updatedAt;
+              const lastActivity = conversation.last_message_at || conversation.created_at;
               const timeDisplay = new Intl.DateTimeFormat("en-US", {
                 hour: "numeric", minute: "2-digit", hour12: true
               }).format(new Date(lastActivity));
 
-              const isInitiatedByMe = conversation.lastMessage?.senderId === user?.id;
+              const isInitiatedByMe = conversation.last_message?.sender_id === user?.id;
 
               return (
                 <div
@@ -128,11 +128,11 @@ export function ConversationList({
                       ? "bg-primary/8 border-l-primary"
                       : "hover:bg-muted/40"
                   )}
-                  onClick={() => onSelect(conversation.id, otherParticipant.userId)}
+                  onClick={() => onSelect(conversation.id, otherParticipant.id)}
                 >
                   <div className="relative">
                     <Avatar className="h-12 w-12 ring-2 ring-background shadow-sm">
-                      <AvatarImage src={otherParticipant.profilePictureUrl || undefined} className="object-cover" />
+                      <AvatarImage src={otherParticipant.profile_picture_url || undefined} className="object-cover" />
                       <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-primary font-semibold">
                         {otherParticipant.name.split(" ").map(n => n[0]).join("")}
                       </AvatarFallback>
@@ -146,13 +146,13 @@ export function ConversationList({
                     <div className="flex items-center justify-between">
                       <span className={cn(
                         "font-semibold text-sm truncate",
-                        conversation.unreadCount > 0 ? "text-foreground" : "text-foreground/80"
+                        conversation.unread_count > 0 ? "text-foreground" : "text-foreground/80"
                       )}>
                         {otherParticipant.name}
                       </span>
                       <span className={cn(
                         "text-[11px] shrink-0 ml-2",
-                        conversation.unreadCount > 0 ? "text-primary font-medium" : "text-muted-foreground"
+                        conversation.unread_count > 0 ? "text-primary font-medium" : "text-muted-foreground"
                       )}>
                         {timeDisplay}
                       </span>
@@ -160,29 +160,31 @@ export function ConversationList({
                     
                     <div className="flex items-center justify-between mt-0.5">
                       <div className="flex items-center gap-1 min-w-0 flex-1">
-                        {isInitiatedByMe && conversation.lastMessage && (
+                        {isInitiatedByMe && conversation.last_message && (
                           <CheckCheck className={cn(
                             "w-3.5 h-3.5 shrink-0",
-                            conversation.lastMessage.deliveryStatus === "seen" ? "text-blue-400" : "text-muted-foreground/50"
+                            conversation.last_message.delivery_status === "seen" ? "text-blue-400" : "text-muted-foreground/50"
                           )} />
                         )}
                         <p className={cn(
                           "text-sm truncate",
-                          conversation.unreadCount > 0
+                          conversation.unread_count > 0
                             ? "text-foreground/70 font-medium"
                             : "text-muted-foreground"
                         )}>
                           {isTyping ? (
                             <span className="text-primary italic">typing...</span>
-                          ) : conversation.lastMessage ? (
-                            conversation.lastMessage.mediaUrl ? "Sent an image" : conversation.lastMessage.content
+                          ) : conversation.last_message ? (
+                            // Wait, wait! `message_type === 'image'` should probably be checked, but we have `last_message.content`
+                            // We don't have `media_url` on `last_message` per backend payload, but we have `message_type`
+                            conversation.last_message.message_type === 'image' ? "Sent an image" : conversation.last_message.content
                           ) : "Start chatting"}
                         </p>
                       </div>
                       
-                      {conversation.unreadCount > 0 && conversation.lastMessage?.senderId !== user?.id && (
+                      {conversation.unread_count > 0 && conversation.last_message?.sender_id !== user?.id && (
                         <span className="ml-2 bg-primary text-primary-foreground text-[10px] font-bold rounded-full h-5 min-w-[20px] px-1.5 flex items-center justify-center shadow-sm shrink-0">
-                          {conversation.unreadCount}
+                          {conversation.unread_count}
                         </span>
                       )}
                     </div>

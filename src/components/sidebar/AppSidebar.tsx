@@ -47,8 +47,8 @@ export const AppSidebar = ({ activeView, onViewChange }: AppSidebarProps) => {
 
   const unreadCount = conversations?.reduce((acc: number, conv: ConversationPayload) => {
     // Only count unread if the last message was NOT sent by me
-    const isReceivedMessage = conv.lastMessage && conv.lastMessage.senderId !== user?.id;
-    return acc + (isReceivedMessage ? conv.unreadCount : 0);
+    const isReceivedMessage = conv.last_message && conv.last_message.sender_id !== user?.id;
+    return acc + (isReceivedMessage ? conv.unread_count : 0);
   }, 0) || 0;
 
   const handleLogout = () => {

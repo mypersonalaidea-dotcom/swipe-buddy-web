@@ -1,49 +1,64 @@
-// ─── Messaging Types ────────────────────────────────────────────────────────
-// Mirrors the backend Prisma schema + socket event payloads
-
 export type DeliveryStatus = "sending" | "sent" | "delivered" | "seen";
 
-export interface Participant {
-  userId: string;
+export interface OtherUser {
+  id: string;
   name: string;
-  profilePictureUrl: string | null;
+  profile_picture_url: string | null;
+  last_seen_at: string | null;
+}
+
+export interface LastMessagePayload {
+  id: string;
+  content: string | null;
+  message_type: string;
+  sender_id: string;
+  delivery_status: DeliveryStatus;
+  created_at: string;
+  is_mine: boolean;
+}
+
+export interface MessageSender {
+  id: string;
+  name: string;
+  profile_picture_url: string | null;
 }
 
 export interface MessagePayload {
   id: string;
-  conversationId: string;
-  senderId: string;
+  conversation_id: string;
+  sender: MessageSender;
   content: string | null;
-  mediaUrl: string | null;
-  replyToId: string | null;
-  deliveryStatus: DeliveryStatus;
-  createdAt: string;
-  updatedAt: string;
-  /** Only set client-side for optimistic messages */
+  message_type: string;
+  media_url: string | null;
+  delivery_status: DeliveryStatus;
+  reply_to?: any;
+  created_at: string;
+  updated_at: string;
   tempId?: string;
 }
 
 export interface ConversationPayload {
   id: string;
-  createdAt: string;
-  updatedAt: string;
-  participants: Participant[];
-  lastMessage: MessagePayload | null;
-  unreadCount: number;
+  other_user: OtherUser | null;
+  unread_count: number;
+  muted: boolean;
+  last_message_at: string | null;
+  status: string;
+  created_at: string;
+  last_message?: LastMessagePayload | null;
 }
 
-/** What the REST "list conversations" endpoint returns */
 export interface ConversationsResponse {
-  conversations: ConversationPayload[];
+  data: ConversationPayload[];
 }
 
-/** What the REST "get messages" endpoint returns (cursor-paginated) */
 export interface MessagesResponse {
-  messages: MessagePayload[];
-  nextCursor: string | null;
+  data: {
+    messages: MessagePayload[];
+    nextCursor: string | null;
+    hasMore: boolean;
+  }
 }
-
-// ─── Socket Event Payloads ──────────────────────────────────────────────────
 
 export interface SendMessageInput {
   conversationId: string;
@@ -55,7 +70,7 @@ export interface SendMessageInput {
 
 export interface NewMessageEvent {
   message: MessagePayload;
-  conversationId: string;
+  conversationId?: string;
 }
 
 export interface MessageSentEvent {
@@ -66,11 +81,13 @@ export interface MessageSentEvent {
 export interface MessageDeliveredEvent {
   messageId: string;
   conversationId: string;
+  deliveredAt: string;
 }
 
 export interface MessageSeenEvent {
   conversationId: string;
-  messageIds: string[];
+  seenBy: string;
+  seenAt: string;
 }
 
 export interface TypingEvent {
@@ -86,5 +103,7 @@ export interface UserOnlineEvent {
 }
 
 export interface ConversationUpdatedEvent {
-  conversation: ConversationPayload;
+  conversationId: string;
+  last_message: LastMessagePayload;
 }
+

@@ -20,6 +20,11 @@ export default defineConfig(({ mode }) => ({
           });
         },
       },
+      "/socket.io": {
+        target: "wss://swipe-service.onrender.com",
+        ws: true,
+        changeOrigin: true,
+      },
     },
   },
   plugins: [

@@ -20,7 +20,7 @@ export function MessageBubble({
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
-  }).format(new Date(message.createdAt));
+  }).format(new Date(message.created_at));
 
   return (
     <div
@@ -51,9 +51,9 @@ export function MessageBubble({
         )}
       >
         {/* If media is present, show image first */}
-        {message.mediaUrl && (
+        {message.media_url && (
           <div className="mb-2 -mx-2 -mt-1 rounded-t border-b border-white/20 overflow-hidden">
-             <img src={message.mediaUrl} alt="Media message" className="w-full h-auto max-h-60 object-cover" />
+             <img src={message.media_url} alt="Media message" className="w-full h-auto max-h-60 object-cover" />
           </div>
         )}
 
@@ -71,7 +71,7 @@ export function MessageBubble({
         >
           <span className="text-[10px]">{time}</span>
           {isSentByMe && (
-            <MessageStatusIcon status={message.deliveryStatus} />
+            <MessageStatusIcon status={message.delivery_status} />
           )}
         </div>
       </div>

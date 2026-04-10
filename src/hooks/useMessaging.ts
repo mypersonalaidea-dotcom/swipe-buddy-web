@@ -25,7 +25,7 @@ export function useConversations() {
     queryKey: ["conversations"],
     queryFn: async () => {
       const { data } = await api.get<ConversationsResponse>("/messages/conversations");
-      return data.conversations;
+      return data.data;
     },
   });
 
@@ -34,27 +34,23 @@ export function useConversations() {
 
     const handleConversationUpdated = (payload: ConversationUpdatedEvent) => {
       queryClient.setQueryData<ConversationPayload[]>(["conversations"], (old) => {
-        if (!old) return [payload.conversation];
+        if (!old) return old; // Requires a fresh fetch, or we could fetch the specific conversation
         
-        // Check if conversation exists
-        const exists = old.some(c => c.id === payload.conversation.id);
+        const exists = old.some(c => c.id === payload.conversationId);
         if (exists) {
           // Replace it and sort
           return old
-            .map(c => c.id === payload.conversation.id ? payload.conversation : c)
+            .map(c => c.id === payload.conversationId ? { ...c, last_message: payload.last_message, last_message_at: payload.last_message.created_at } : c)
             .sort((a, b) => {
-              const aTime = a.lastMessage?.createdAt || a.createdAt;
-              const bTime = b.lastMessage?.createdAt || b.createdAt;
+              const aTime = a.last_message?.created_at || a.created_at;
+              const bTime = b.last_message?.created_at || b.created_at;
               return new Date(bTime).getTime() - new Date(aTime).getTime();
             });
         }
         
-        // Add new conversation and sort
-        return [payload.conversation, ...old].sort((a, b) => {
-          const aTime = a.lastMessage?.createdAt || a.createdAt;
-          const bTime = b.lastMessage?.createdAt || b.createdAt;
-          return new Date(bTime).getTime() - new Date(aTime).getTime();
-        });
+        // If not exists, we ideally fetch it but for now we'll just invalidate
+        queryClient.invalidateQueries({ queryKey: ["conversations"] });
+        return old;
       });
     };
 
@@ -71,12 +67,12 @@ export function useMessages(conversationId: string | null) {
   return useInfiniteQuery({
     queryKey: ["messages", conversationId],
     queryFn: async ({ pageParam }) => {
-      if (!conversationId) return { messages: [], nextCursor: null };
+      if (!conversationId) return { messages: [], nextCursor: null, hasMore: false };
       const url = pageParam 
         ? `/messages/conversations/${conversationId}?cursor=${pageParam}` 
         : `/messages/conversations/${conversationId}`;
       const { data } = await api.get<MessagesResponse>(url);
-      return data;
+      return data.data;
     },
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
@@ -89,8 +85,8 @@ export function useStartConversation() {
   
   return useMutation({
     mutationFn: async (userId: string) => {
-      const { data } = await api.post<{ conversation: ConversationPayload }>("/messages/conversations", { userId });
-      return data.conversation;
+      const { data } = await api.post<{ data: { conversation: ConversationPayload, isNew: boolean } }>("/messages/conversations", { other_user_id: userId });
+      return data.data.conversation;
     },
     onSuccess: (newConversation) => {
       queryClient.setQueryData<ConversationPayload[]>(["conversations"], (old) => {
@@ -131,14 +127,14 @@ export function useChat(activeConversationId: string | null) {
   useEffect(() => {
     if (!socket || !activeConversationId) return;
     
-    socket.emit("join_conversation", activeConversationId);
+    socket.emit("join_conversation", { conversationId: activeConversationId });
     setTypingUsers(new Set()); // Reset typing state on room change
     
     // Mark as read when entering
-    socket.emit("mark_read", activeConversationId);
+    socket.emit("mark_read", { conversationId: activeConversationId });
     
     return () => {
-      socket.emit("leave_conversation", activeConversationId);
+      socket.emit("leave_conversation", { conversationId: activeConversationId });
     };
   }, [socket, activeConversationId]);
   
@@ -147,13 +143,15 @@ export function useChat(activeConversationId: string | null) {
     if (!socket) return;
     
     const handleNewMessage = (payload: NewMessageEvent) => {
+      const targetConvId = payload.conversationId || payload.message.conversation_id;
       // Play sound if message is not in the active conversation, or if window is hidden
-      if (payload.conversationId !== activeConversationId || document.hidden) {
+      if (targetConvId !== activeConversationId || document.hidden) {
+        // Assume notify sound plays
         playNotificationSound();
       }
       
       // Update messages list if this conversation is loaded
-      queryClient.setQueryData(["messages", payload.conversationId], (old: any) => {
+      queryClient.setQueryData(["messages", targetConvId], (old: any) => {
         if (!old) return old;
         const newPages = [...old.pages];
         if (newPages.length > 0) {
@@ -167,13 +165,13 @@ export function useChat(activeConversationId: string | null) {
       });
       
       // Mark as read immediately if we are in this conversation and window is active
-      if (payload.conversationId === activeConversationId && !document.hidden) {
-        socket.emit("mark_read", activeConversationId);
+      if (targetConvId === activeConversationId && !document.hidden) {
+        socket.emit("mark_read", { conversationId: activeConversationId });
       }
     };
     
     const handleMessageSent = (payload: MessageSentEvent) => {
-      queryClient.setQueryData(["messages", payload.message.conversationId], (old: any) => {
+      queryClient.setQueryData(["messages", payload.message.conversation_id], (old: any) => {
         if (!old) return old;
         const newPages = old.pages.map((page: any) => ({
           ...page,
@@ -191,8 +189,8 @@ export function useChat(activeConversationId: string | null) {
         const newPages = old.pages.map((page: any) => ({
           ...page,
           messages: page.messages.map((m: MessagePayload) => 
-            m.id === payload.messageId && m.deliveryStatus !== "seen" 
-              ? { ...m, deliveryStatus: "delivered" as const } 
+            m.id === payload.messageId && m.delivery_status !== "seen" 
+              ? { ...m, delivery_status: "delivered" as const } 
               : m
           )
         }));
@@ -206,10 +204,10 @@ export function useChat(activeConversationId: string | null) {
         const newPages = old.pages.map((page: any) => ({
           ...page,
           messages: page.messages.map((m: MessagePayload) => 
-            payload.messageIds.includes(m.id) 
-              ? { ...m, deliveryStatus: "seen" as const } 
+            m.delivery_status !== "seen"
+              ? { ...m, delivery_status: "seen" as const } 
               : m
-          )
+          ) // Marking all previously unseen messages as seen
         }));
         return { ...old, pages: newPages };
       });
@@ -247,22 +245,27 @@ export function useChat(activeConversationId: string | null) {
     if (!socket || !activeConversationId || !user) return;
     
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
     const optimisticMessage: MessagePayload = {
       id: tempId,
-      tempId,
-      conversationId: activeConversationId,
-      senderId: user.id,
+      conversation_id: activeConversationId,
+      sender: {
+        id: user.id,
+        name: user.name || "Me",
+        profile_picture_url: (user as any).profile_picture_url || null,
+      },
       content: content || null,
-      mediaUrl: mediaUrl || null,
-      replyToId: replyToId || null,
-      deliveryStatus: "sending",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      message_type: "text",
+      media_url: mediaUrl || null,
+      delivery_status: "sending",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      tempId
     };
     
     // Add optimistic message to UI
     queryClient.setQueryData(["messages", activeConversationId], (old: any) => {
-      if (!old) return { pages: [{ messages: [optimisticMessage], nextCursor: null }], pageParams: [null] };
+      if (!old) return { pages: [{ messages: [optimisticMessage], nextCursor: null, hasMore: false }], pageParams: [null] };
       
       const newPages = [...old.pages];
       if (newPages.length > 0) {
@@ -291,14 +294,14 @@ export function useChat(activeConversationId: string | null) {
   const notifyTyping = useCallback(() => {
     if (!socket || !activeConversationId) return;
     
-    socket.emit("typing_start", activeConversationId);
+    socket.emit("typing_start", { conversationId: activeConversationId });
     
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
     }
     
     typingTimeoutRef.current = setTimeout(() => {
-      socket.emit("typing_stop", activeConversationId);
+      socket.emit("typing_stop", { conversationId: activeConversationId });
     }, 3000);
   }, [socket, activeConversationId]);
   

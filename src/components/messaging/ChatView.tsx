@@ -65,10 +65,10 @@ export function ChatView({ conversation, onBack, onViewProfile }: ChatViewProps)
     );
   }
 
-  const otherParticipant = conversation.participants.find(p => p.userId !== user?.id);
-  const isOnline = otherParticipant ? isUserOnline(otherParticipant.userId) : false;
-  const lastSeen = otherParticipant ? getUserLastSeen(otherParticipant.userId) : null;
-  const isTyping = otherParticipant ? typingUsers.has(otherParticipant.userId) : false;
+  const otherParticipant = conversation.other_user;
+  const isOnline = otherParticipant ? isUserOnline(otherParticipant.id) : false;
+  const lastSeen = otherParticipant ? getUserLastSeen(otherParticipant.id) : null;
+  const isTyping = otherParticipant ? typingUsers.has(otherParticipant.id) : false;
 
   const messages = data?.pages.flatMap((page: any) => page.messages).reverse() || [];
 
@@ -76,7 +76,7 @@ export function ChatView({ conversation, onBack, onViewProfile }: ChatViewProps)
   const groupedMessages = messages.reduce<Record<string, MessagePayload[]>>((groups, message) => {
     const date = new Intl.DateTimeFormat("en-US", {
       month: "short", day: "numeric", year: "numeric",
-    }).format(new Date(message.createdAt));
+    }).format(new Date(message.created_at));
     
     if (!groups[date]) groups[date] = [];
     groups[date].push(message);
@@ -92,11 +92,11 @@ export function ChatView({ conversation, onBack, onViewProfile }: ChatViewProps)
         </Button>
         <div
           className="flex items-center gap-3 flex-1 cursor-pointer group"
-          onClick={() => otherParticipant && onViewProfile(otherParticipant.userId)}
+          onClick={() => otherParticipant && onViewProfile(otherParticipant.id)}
         >
           <div className="relative">
             <Avatar className="h-10 w-10 ring-2 ring-background shadow-sm group-hover:ring-primary/30 transition-all">
-              <AvatarImage src={otherParticipant?.profilePictureUrl || undefined} className="object-cover" />
+              <AvatarImage src={otherParticipant?.profile_picture_url || undefined} className="object-cover" />
               <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-primary font-semibold">
                 {otherParticipant?.name.split(" ").map(n => n[0]).join("")}
               </AvatarFallback>
@@ -129,7 +129,7 @@ export function ChatView({ conversation, onBack, onViewProfile }: ChatViewProps)
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="rounded-xl shadow-lg border-border/50">
-              <DropdownMenuItem className="rounded-lg cursor-pointer" onClick={() => otherParticipant && onViewProfile(otherParticipant.userId)}>
+              <DropdownMenuItem className="rounded-lg cursor-pointer" onClick={() => otherParticipant && onViewProfile(otherParticipant.id)}>
                 <UserIcon className="h-4 w-4 mr-2" />
                 View Profile
               </DropdownMenuItem>
@@ -180,14 +180,14 @@ export function ChatView({ conversation, onBack, onViewProfile }: ChatViewProps)
                 {(msgs as MessagePayload[]).map((message, index) => {
                   const prevMsg = index > 0 ? (msgs as MessagePayload[])[index - 1] : null;
                   const nextMsg = index < (msgs as MessagePayload[]).length - 1 ? (msgs as MessagePayload[])[index + 1] : null;
-                  const isFirstInGroup = !prevMsg || prevMsg.senderId !== message.senderId;
-                  const isLastInGroup = !nextMsg || nextMsg.senderId !== message.senderId;
+                  const isFirstInGroup = !prevMsg || prevMsg.sender.id !== message.sender.id;
+                  const isLastInGroup = !nextMsg || nextMsg.sender.id !== message.sender.id;
                   
                   return (
                     <MessageBubble 
                       key={message.id || message.tempId}
                       message={message}
-                      isSentByMe={message.senderId === user?.id}
+                      isSentByMe={message.sender.id === user?.id}
                       isFirstInGroup={isFirstInGroup}
                       isLastInGroup={isLastInGroup}
                     />

@@ -26,18 +26,21 @@ export const MessagePage = () => {
       // User clicked "Message" on someone's profile
       startConversation(targetUserId, {
         onSuccess: (conversation) => {
-          setSearchParams({ conversation: conversation.id });
+          setSearchParams({ activeView: "messages", conversation: conversation.id });
+        },
+        onError: () => {
+          setSearchParams({ activeView: "messages" }); // Clear newChat on error to unblock UI
         }
       });
     }
   }, [targetUserId, startConversation, setSearchParams]);
 
   const handleSelectConversation = (id: string) => {
-    setSearchParams({ conversation: id });
+    setSearchParams({ activeView: "messages", conversation: id });
   };
 
   const handleBackToList = () => {
-    setSearchParams({});
+    setSearchParams({ activeView: "messages" });
   };
 
   const handleViewProfile = (userId: string) => {
