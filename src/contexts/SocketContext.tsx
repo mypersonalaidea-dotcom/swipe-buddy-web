@@ -18,11 +18,13 @@ interface SocketContextType {
 
 const SocketContext = createContext<SocketContextType | null>(null);
 
+// Global map to preserve presence across STRICT MODE remounts
+const globalOnlineUsers = new Map<string, OnlineUser>();
+
 export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuth();
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const onlineUsers = useRef<Map<string, OnlineUser>>(new Map());
   // Ref to force re-render when online status changes for components that care
   const [, setOnlineUsersVersion] = useState(0);
 
@@ -32,7 +34,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
         disconnectSocket();
         setSocket(null);
         setIsConnected(false);
-        onlineUsers.current.clear();
+        globalOnlineUsers.clear();
       }
       return;
     }
@@ -44,7 +46,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     const onDisconnect = () => setIsConnected(false);
     
     const onUserOnline = (payload: UserOnlineEvent) => {
-      onlineUsers.current.set(payload.userId, {
+      globalOnlineUsers.set(payload.userId, {
         isOnline: payload.isOnline,
         lastSeenAt: payload.lastSeenAt,
       });
@@ -65,11 +67,11 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   }, [isAuthenticated]);
 
   const isUserOnline = useCallback((userId: string) => {
-    return onlineUsers.current.get(userId)?.isOnline ?? false;
+    return globalOnlineUsers.get(userId)?.isOnline ?? false;
   }, []);
 
   const getUserLastSeen = useCallback((userId: string) => {
-    return onlineUsers.current.get(userId)?.lastSeenAt ?? null;
+    return globalOnlineUsers.get(userId)?.lastSeenAt ?? null;
   }, []);
 
   return (
