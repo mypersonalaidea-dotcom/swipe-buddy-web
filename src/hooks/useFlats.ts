@@ -12,6 +12,7 @@ export interface FlatRoom {
   available_from: string | null;
   furnishing_type?: string;
   room_amenities: string[];
+  description?: string;
   media: { media_url: string; media_type: string }[];
 }
 

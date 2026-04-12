@@ -38,6 +38,7 @@ export const mockProfiles: Profile[] = [
       rooms: [
         {
           id: "1",
+          name: "Master Bedroom",
           type: "Private Room",
           rent: "₹15,000/month",
           available: 2,
@@ -50,6 +51,7 @@ export const mockProfiles: Profile[] = [
         },
         {
           id: "2",
+          name: "Study Room",
           type: "Shared Room",
           rent: "₹8,000/month",
           available: 3,

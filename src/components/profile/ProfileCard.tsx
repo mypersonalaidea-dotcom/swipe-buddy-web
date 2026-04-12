@@ -2,21 +2,22 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { MapPin, Briefcase, GraduationCap, Home, Send, Heart, MoreVertical, Flag, ShieldOff, ExternalLink, ChevronDown, ChevronUp, DoorOpen, Calendar, IndianRupee } from "lucide-react";
+import {
+  MapPin, Briefcase, GraduationCap, Home, Send, Heart, Bookmark,
+  ExternalLink, ChevronDown, DoorOpen, Calendar, Sofa, IndianRupee, Smile
+} from "lucide-react";
+import data from '@emoji-mart/data';
+import Picker from '@emoji-mart/react';
 import { MAPBOX_TOKEN, GOOGLE_MAPS_API_KEY, MAP_PROVIDER } from "@/lib/maps/config";
 import { GoogleMapRenderer } from "@/components/map/GoogleMapRenderer";
 import { MapboxMapRenderer } from "@/components/map/MapboxMapRenderer";
 import { getHabitIcon } from "@/constants/habits";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useSaveProfile } from "@/hooks/useSocial";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+
+/* ─── Types ─── */
 
 interface JobExperience {
   id: string;
@@ -37,6 +38,7 @@ interface EducationExperience {
 
 interface Room {
   id: string;
+  name?: string;
   type: string;
   rent: string;
   available: number;
@@ -44,6 +46,7 @@ interface Room {
   securityDeposit: string;
   availableFrom: string;
   furnishingType: string;
+  description?: string;
   amenities: string[];
   photos: string[];
 }
@@ -64,9 +67,10 @@ export interface Profile {
   education?: string[];
   flatDetails?: {
     address: string;
-    /** [longitude, latitude] — populated from AddressAutocomplete */
     coordinates?: [number, number];
+    flatType?: string;
     furnishingType: string;
+    description?: string;
     commonAmenities: string[];
     commonPhotos: string[];
     rooms: Room[];
@@ -80,16 +84,50 @@ interface ProfileCardProps {
   isSaved?: boolean;
 }
 
-// Mock list of profile IDs the user has already messaged
 const conversationProfileIds = ["1", "3"];
+
+const flatTypeLabels: Record<string, string> = {
+  '1rk': '1 RK', '1bhk': '1 BHK', '2bhk': '2 BHK',
+  '3bhk': '3 BHK', '4bhk': '4 BHK', '4+bhk': '4+ BHK',
+};
+
+/** Returns true only for non-empty, real URLs */
+const isValidPhoto = (url: string | undefined | null): url is string =>
+  !!url && url.length > 0 && url !== "";
+
+const OrganizationLogoPill = ({ icon: Icon, name, type, text }: { icon: any, name?: string, type: 'job' | 'education', text: React.ReactNode }) => {
+  const [imgState, setImgState] = useState<'loading'|'loaded'|'error'>('loading');
+  const domain = name ? name.toLowerCase().replace(/[^a-z0-9]/g, '') + (type === 'education' ? '.edu' : '.com') : '';
+  const url = `https://logo.clearbit.com/${domain}`;
+  
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg border border-gray-100 bg-white text-[#71738B] font-medium shadow-sm">
+      <div className="relative w-[14px] h-[14px] flex-shrink-0 flex items-center justify-center">
+        {name && imgState !== 'error' && (
+          <img 
+              src={url} 
+              alt={name}
+              className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-200 ${imgState === 'loaded' ? 'opacity-100' : 'opacity-0'}`}
+              onLoad={() => setImgState('loaded')}
+              onError={() => setImgState('error')}
+          />
+        )}
+        {(imgState !== 'loaded' || !name) && (
+          <Icon className="w-[14px] h-[14px] text-[#A0A2B8] stroke-[2]" />
+        )}
+      </div>
+      {text}
+    </span>
+  );
+};
 
 export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isSaved = false }: ProfileCardProps) => {
   const isLookingForFlatmate = profile.searchType === "flatmate";
   const { toast } = useToast();
   const [saved, setSaved] = useState(isSaved);
   const [expandedRooms, setExpandedRooms] = useState<Set<string>>(new Set());
+  const [activeRoomPhoto, setActiveRoomPhoto] = useState<Record<string, number>>({});
 
-  // Check if already in conversation (either passed as prop or from mock data)
   const hasExistingConversation = alreadyInConversation ?? conversationProfileIds.includes(profile.id);
 
   const [message, setMessage] = useState(
@@ -98,198 +136,253 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
       : `Hey! ${profile.name}, I've got a flat vacancy. Want to know the details?`
   );
 
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const emojiBtnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        emojiPickerRef.current && !emojiPickerRef.current.contains(target) &&
+        emojiBtnRef.current && !emojiBtnRef.current.contains(target)
+      ) {
+        setShowEmojiPicker(false);
+      }
+    };
+    if (showEmojiPicker) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showEmojiPicker]);
   const handleSendMessage = () => {
     console.log("Sending message:", message);
-    // TODO: Implement actual message sending
   };
 
-  const { mutate: toggleSaveMutation, isPending } = useSaveProfile();
+  const { mutate: toggleSaveMutation } = useSaveProfile();
 
   const handleSaveProfile = (e: React.MouseEvent) => {
     e.stopPropagation();
     const newSavedState = !saved;
-    
-    // Toggle state immediately (Optimistic UI)
     setSaved(newSavedState);
-    
-    // Call API
     toggleSaveMutation(profile.id, {
-      onError: () => {
-        // Rollback on error
-        setSaved(!newSavedState);
-      },
-      onSuccess: () => {
-        onSaveProfile?.(profile.id, newSavedState);
-      }
+      onError: () => setSaved(!newSavedState),
+      onSuccess: () => onSaveProfile?.(profile.id, newSavedState),
     });
   };
 
+  const toggleRoom = (roomId: string) => {
+    setExpandedRooms((prev) => {
+      const next = new Set(prev);
+      next.has(roomId) ? next.delete(roomId) : next.add(roomId);
+      return next;
+    });
+  };
+
+  const getActiveIdx = (roomId: string) => activeRoomPhoto[roomId] ?? 0;
+
+  /* helper: get only valid photos for a room */
+  const getValidPhotos = (photos: string[]) => photos.filter(isValidPhoto);
+
   return (
-    <Card className="shadow-card bg-gradient-card overflow-hidden">
-      {/* ── Top Section: Pink gradient header — two-column layout ── */}
-      <div className="bg-gradient-to-b from-rose-100/80 to-background">
-        <div className="flex p-4 gap-4">
-          {/* Left: Large profile image */}
-          <div className="relative flex-shrink-0 w-36 sm:w-44">
-            <img
-              src={profile.profilePicture}
-              alt={profile.name}
-              className="w-full h-full object-cover rounded-2xl border-2 border-white/80 shadow-md"
-            />
-            <span className="absolute bottom-2 right-2 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white" />
+    <Card className="relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-lg w-full">
+      {/* ───── Soft pink header background ───── */}
+      <div className="absolute inset-x-0 top-0 h-[200px] bg-rose-50 pointer-events-none" />
+
+      {/* ╔══════════════════════════════════════════════════════════╗
+          ║ HEADER & MESSAGE SECTION                                   ║
+          ╚══════════════════════════════════════════════════════════╝ */}
+      <div className="relative z-10 px-6 pt-6 pb-6 w-full">
+        <div className="flex items-stretch gap-6 w-full">
+          {/* ── Left Col: Profile photo (large rounded square) ── */}
+          <div className="relative flex-shrink-0">
+            <div className="w-[148px] h-[148px] rounded-[32px] overflow-hidden border-[4px] border-white shadow-sm bg-white">
+              {isValidPhoto(profile.profilePicture) ? (
+                <img src={profile.profilePicture} alt={profile.name} className="w-full h-full object-cover rounded-[28px]" />
+              ) : (
+                <div className="w-full h-full bg-gray-100 flex items-center justify-center rounded-[28px]">
+                  <Home className="w-10 h-10 text-gray-300" />
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Right: Info + Actions + Message */}
-          <div className="flex-1 min-w-0 space-y-3">
-            {/* Name + Actions row */}
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 space-y-1">
-                <h2 className="text-2xl font-bold text-foreground leading-tight">
-                  {profile.name}<span className="font-normal text-muted-foreground">, {profile.age}</span>
-                </h2>
-                <p className="flex items-center gap-1 text-sm text-muted-foreground">
-                  <MapPin className="w-3.5 h-3.5 text-rose-500 flex-shrink-0" />
-                  {profile.city}, {profile.state}
-                </p>
-                  {/* Profession & Education tags */}
-                <div className="flex flex-wrap gap-1.5 pt-0.5">
-                  {(profile.jobExperiences.length > 0) && (
-                    <Badge variant="outline" className="text-xs font-normal bg-white/70 border-border/60 gap-1">
-                      <Briefcase className="w-3 h-3" />
-                      {typeof profile.jobExperiences[0] === 'string' 
-                        ? profile.jobExperiences[0] 
-                        : profile.jobExperiences[0].position}
-                    </Badge>
-                  )}
-                  {(profile.educationExperiences.length > 0) && (
-                    <Badge variant="outline" className="text-xs font-normal bg-white/70 border-border/60 gap-1">
-                      <GraduationCap className="w-3 h-3" />
-                      {typeof profile.educationExperiences[0] === 'string' 
-                        ? profile.educationExperiences[0] 
-                        : profile.educationExperiences[0].institution}
-                    </Badge>
-                  )}
+          {/* ── Right Col: Info + Actions ── */}
+          <div className="flex-1 min-w-0 flex flex-col justify-between py-1">
+            {/* Top Info block */}
+            <div className="flex flex-col flex-1">
+              {/* Row: Name + Bookmark + Badge */}
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-[20px] font-bold text-[#2A2B3D] leading-tight flex items-baseline gap-1">
+                    {profile.name}<span className="text-[18px] font-semibold text-[#8C8D9E]">,{profile.age}</span>
+                  </h2>
+                  <p className="flex items-center gap-1.5 text-[12px] text-[#71738B] mt-1 font-medium">
+                    <MapPin className="w-3.5 h-3.5 text-[#F43F5E] flex-shrink-0 stroke-[2.5]" />
+                    {profile.city}, {profile.state}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3.5 flex-shrink-0">
+                  <button onClick={handleSaveProfile} className="hover:opacity-70 transition-opacity">
+                    <Bookmark className={`w-[18px] h-[18px] ${saved ? "fill-[#71738B] text-[#71738B] stroke-[2]" : "text-[#A0A2B8] stroke-[2]"}`} />
+                  </button>
+                  <Badge className={`px-3.5 py-1.5 text-[11px] font-semibold rounded-lg border-0 shadow-sm ${
+                    isLookingForFlatmate
+                      ? "bg-[#E11D48] text-white hover:bg-[#E11D48]"
+                      : "bg-blue-600 text-white hover:bg-blue-600"
+                  }`}>
+                    {isLookingForFlatmate ? "Has Flat" : "Looking for Flat"}
+                  </Badge>
                 </div>
               </div>
 
-              {/* Actions: bookmark, menu, badge */}
-              <div className="flex items-center gap-1 flex-shrink-0">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleSaveProfile}
-                  className="h-8 w-8 rounded-full hover:bg-white/60"
-                >
-                  <Heart className={`h-4 w-4 transition-all duration-300 ${saved ? "fill-rose-500 text-rose-500 scale-110" : "text-muted-foreground"}`} />
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-white/60">
-                      <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="rounded-xl shadow-lg border-border/50">
-                    <DropdownMenuItem className="rounded-lg cursor-pointer text-destructive focus:text-destructive">
-                      <Flag className="h-4 w-4 mr-2" />
-                      Report User
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="rounded-lg cursor-pointer text-destructive focus:text-destructive">
-                      <ShieldOff className="h-4 w-4 mr-2" />
-                      Block User
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <Badge
-                  className={`h-7 px-3 text-xs font-semibold rounded-full border-0 ${
-                    isLookingForFlatmate
-                      ? "bg-rose-600 text-white hover:bg-rose-700"
-                      : "bg-blue-600 text-white hover:bg-blue-700"
-                  }`}
-                >
-                  {isLookingForFlatmate ? "Has Flat" : "Looking for Flat"}
-                </Badge>
+              {/* Pills: Job + Education */}
+              <div className="flex flex-wrap gap-2.5 mt-2.5">
+                {profile.jobExperiences.length > 0 && (() => {
+                  const job = profile.jobExperiences[0];
+                  const isString = typeof job === 'string';
+                  const jobText = isString ? job : `${job.position} at ${job.company}`;
+                  const jobName = isString ? job.split(' at ')[1] || job : job.company;
+                  return <OrganizationLogoPill type="job" icon={Briefcase} name={jobName} text={jobText} />;
+                })()}
+                {profile.educationExperiences.length > 0 && (() => {
+                  const edu = profile.educationExperiences[0];
+                  const isString = typeof edu === 'string';
+                  const eduText = isString ? edu : `${edu.degree || 'Degree'} from ${edu.institution}`;
+                  const eduName = isString ? edu.split(' from ')[1] || edu : edu.institution;
+                  return <OrganizationLogoPill type="education" icon={GraduationCap} name={eduName} text={eduText} />;
+                })()}
               </div>
             </div>
 
-            {/* Conversation bar or Message box */}
-            {hasExistingConversation ? (
-              <div className="bg-gradient-to-r from-rose-50 to-rose-100/60 rounded-lg px-4 py-2.5 flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-orange-400 flex-shrink-0" />
-                <p className="text-sm text-foreground/80">
-                  In conversation with <span className="font-semibold text-foreground">{profile.name}</span>
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <Textarea
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  className="min-h-[70px] resize-none bg-white/70 border-border/40 text-sm"
-                  placeholder="Type your message..."
-                />
-                <Button onClick={handleSendMessage} className="w-full" size="sm">
-                  <Send className="mr-2 h-3.5 w-3.5" />
-                  Send Message
-                </Button>
-              </div>
-            )}
+            {/* Conversation / Message Input block */}
+            <div className="mt-3">
+              {hasExistingConversation ? (
+                <div className="rounded-lg px-4 py-3 flex items-center gap-2.5 bg-rose-50/80 border border-rose-100/80 w-full h-[40px]">
+                  <span className="w-2.5 h-2.5 rounded-full bg-orange-400 flex-shrink-0" />
+                  <p className="text-[12px] text-gray-600 truncate">
+                    In conversation with <span className="font-bold text-gray-900">{profile.name}</span>
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-stretch gap-2.5 w-full h-[40px]">
+                  <div className="flex-1 min-w-0 relative">
+                    <input
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      className="w-full h-full rounded-lg border border-gray-200 bg-white pl-3 pr-10 text-[12px] text-[#2A2B3D] placeholder:text-[#A0A2B8] focus:outline-none focus:ring-2 focus:ring-rose-200 focus:border-rose-300 transition-shadow shadow-sm"
+                      placeholder="Type your message..."
+                    />
+                    <button
+                      ref={emojiBtnRef}
+                      type="button"
+                      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[#A0A2B8] hover:text-[#71738B] transition-colors"
+                    >
+                      <Smile className="w-[18px] h-[18px] stroke-[1.5]" />
+                    </button>
+                    {showEmojiPicker && createPortal(
+                      <div
+                        ref={emojiPickerRef}
+                        className="fixed z-[9999] shadow-xl rounded-xl overflow-hidden bg-white border border-gray-200"
+                        style={{
+                          top: (emojiBtnRef.current?.getBoundingClientRect().bottom ?? 0) + 8,
+                          left: Math.max(8, (emojiBtnRef.current?.getBoundingClientRect().right ?? 0) - 352),
+                        }}
+                      >
+                        <Picker
+                          data={data}
+                          onEmojiSelect={(emoji: any) => {
+                            setMessage((prev) => prev + emoji.native);
+                            setShowEmojiPicker(false);
+                          }}
+                          theme="light"
+                          previewPosition="none"
+                          skinTonePosition="none"
+                          set="native"
+                        />
+                      </div>,
+                      document.body
+                    )}
+                  </div>
+                  <Button
+                    onClick={handleSendMessage}
+                    className="w-[40px] h-[40px] rounded-lg flex items-center justify-center bg-[#E11D48] hover:bg-rose-700 text-white shadow-sm shrink-0 p-0"
+                  >
+                    <Send className="h-[18px] w-[18px] stroke-[2]" />
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      <Separator />
+      {/* Divider */}
+      <div className="h-px bg-gray-100 mx-6" />
 
-      <CardContent className="space-y-6 pt-6 max-h-[calc(100vh-400px)] overflow-y-auto">
-        {/* Flat Details (for flatmate search) */}
+      {/* ╔══════════════════════════════════════════════════════════╗
+          ║ SCROLLABLE CONTENT                                     ║
+          ╚══════════════════════════════════════════════════════════╝ */}
+      <CardContent className="relative z-10 space-y-7 pt-5 pb-6 px-6 max-h-[calc(100vh-340px)] overflow-y-auto">
+        {/* ──────── FLAT DETAILS ──────── */}
         {isLookingForFlatmate && profile.flatDetails && (
-          <div className="space-y-6">
-            {/* Flat Details - Address & Map */}
+          <div className="space-y-7">
+            {/* Flat info card */}
             <div className="space-y-3">
-              <h3 className="text-lg font-semibold flex items-center gap-2 text-foreground">
-                <Home className="h-5 w-5 text-primary" />
-                Flat Details
+              <h3 className="flex items-center gap-2.5 text-[14px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+                <Home className="w-5 h-5 text-rose-500" />
+                FLAT DETAILS
               </h3>
-
-              <div className="border rounded-lg overflow-hidden bg-muted/30">
-                <div className="grid grid-cols-1 md:grid-cols-5">
-                  {/* Address & Furnishing */}
-                  <div className="p-4 md:col-span-3 space-y-2">
-                    <p className="flex items-start gap-2">
-                      <MapPin className="h-4 w-4 mt-1 text-primary flex-shrink-0" />
-                      <span className="text-sm">{profile.flatDetails.address}</span>
+              <div className="rounded-xl border border-gray-200/70 overflow-hidden">
+                <div className="flex flex-col md:flex-row">
+                  {/* Left: address + pills + description */}
+                  <div className="flex-1 p-5 space-y-3">
+                    <p className="flex items-start gap-2 text-[13px] text-gray-700 leading-snug">
+                      <MapPin className="w-4 h-4 mt-0.5 text-rose-500 flex-shrink-0" />
+                      {profile.flatDetails.address}
                     </p>
-                    <div>
-                      <span className="font-medium text-foreground text-sm">Furnishing: </span>
-                      <Badge variant="outline">{profile.flatDetails.furnishingType}</Badge>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {profile.flatDetails.flatType && (
+                        <span className="inline-flex items-center gap-1.5 text-[12px] px-3 py-[5px] rounded-full border border-gray-200 text-gray-700 font-medium">
+                          <Home className="w-3.5 h-3.5 text-gray-400" />
+                          {flatTypeLabels[profile.flatDetails.flatType] || profile.flatDetails.flatType}
+                        </span>
+                      )}
+                      {profile.flatDetails.furnishingType && (
+                        <span className="inline-flex items-center gap-1.5 text-[12px] px-3 py-[5px] rounded-full border border-gray-200 text-gray-700 font-medium capitalize">
+                          <Sofa className="w-3.5 h-3.5 text-gray-400" />
+                          {profile.flatDetails.furnishingType}
+                        </span>
+                      )}
                     </div>
+                    {profile.flatDetails.description && (
+                      <p className="text-[13px] text-gray-500 leading-relaxed">
+                        {profile.flatDetails.description}
+                      </p>
+                    )}
                   </div>
-
-                  {/* Location Map — Static Image */}
-                  <div className="relative h-32 bg-muted border-t md:border-t-0 md:border-l border-border md:col-span-2 overflow-hidden">
+                  {/* Right: Map (50% width) */}
+                  <div className="w-full md:flex-1 h-48 md:h-auto min-h-[180px] bg-rose-50/30 border-t md:border-t-0 md:border-l border-gray-200/70 flex items-center justify-center overflow-hidden relative">
                     {(() => {
                       const coords = profile.flatDetails.coordinates;
                       if (!coords) {
                         return (
-                          <div className="h-full flex flex-col items-center justify-center gap-1.5">
-                            <MapPin className="w-5 h-5 text-muted-foreground/40" />
-                            <p className="text-muted-foreground text-xs">No location found</p>
+                          <div className="flex flex-col items-center gap-1.5">
+                            <MapPin className="w-6 h-6 text-gray-300" />
+                            <p className="text-[11px] text-gray-400 font-medium">Map View</p>
                           </div>
                         );
                       }
-
                       const [lng, lat] = coords;
                       const hasGoogle = MAP_PROVIDER === 'google' && !!GOOGLE_MAPS_API_KEY;
                       const hasMapbox = MAPBOX_TOKEN && MAPBOX_TOKEN.startsWith('pk.');
-
                       if (!hasGoogle && !hasMapbox) {
                         return (
-                          <div className="h-full flex flex-col items-center justify-center gap-1.5">
-                            <MapPin className="w-5 h-5 text-muted-foreground/40" />
-                            <p className="text-muted-foreground text-xs">No map token configured</p>
+                          <div className="flex flex-col items-center gap-1.5">
+                            <MapPin className="w-6 h-6 text-gray-300" />
+                            <p className="text-[11px] text-gray-400 font-medium">Map View</p>
                           </div>
                         );
                       }
-
                       return (
                         <>
                           {hasGoogle ? (
@@ -301,9 +394,9 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                             href={`https://www.google.com/maps?q=${lat},${lng}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="absolute bottom-1.5 right-1.5 flex items-center gap-1 text-[10px] bg-background/90 backdrop-blur-sm px-1.5 py-0.5 rounded-full border border-border text-muted-foreground hover:text-foreground transition-colors z-10"
+                            className="absolute bottom-2 right-2 flex items-center gap-1 text-[10px] bg-white/90 px-2 py-1 rounded-full border border-gray-200 text-gray-500 hover:text-gray-700 z-10 shadow-sm"
                           >
-                            Open in Maps <ExternalLink className="w-2.5 h-2.5" />
+                            Open <ExternalLink className="w-2.5 h-2.5" />
                           </a>
                         </>
                       );
@@ -313,274 +406,282 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
               </div>
             </div>
 
-            {/* Available Rooms */}
+            {/* ──────── AVAILABLE ROOMS ──────── */}
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2 text-foreground">
-                <DoorOpen className="h-4 w-4 text-rose-500" />
-                Available Rooms
+              <h3 className="flex items-center gap-2.5 text-[14px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+                <DoorOpen className="w-5 h-5 text-rose-500" />
+                AVAILABLE ROOMS
               </h3>
-              {profile.flatDetails.rooms.map((room) => {
-                const isExpanded = expandedRooms.has(room.id);
-                return (
-                  <div key={room.id} className="border rounded-xl overflow-hidden bg-background transition-shadow hover:shadow-md">
-                    {/* Collapsed header — always visible */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setExpandedRooms(prev => {
-                          const next = new Set(prev);
-                          next.has(room.id) ? next.delete(room.id) : next.add(room.id);
-                          return next;
-                        });
-                      }}
-                      className="w-full flex items-center gap-3 p-3 text-left hover:bg-muted/40 transition-colors"
-                    >
-                      {/* Thumbnail */}
-                      <div className="w-14 h-14 rounded-lg bg-muted flex-shrink-0 overflow-hidden">
-                        {room.photos[0] ? (
-                          <img src={room.photos[0]} alt={room.type} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Home className="w-5 h-5 text-muted-foreground/40" />
-                          </div>
-                        )}
-                      </div>
-                      {/* Title & rent */}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-foreground">{room.type}</p>
-                        <p className="text-sm text-muted-foreground">{room.rent} · {room.available} available</p>
-                      </div>
-                      {/* Badge + Chevron */}
-                      <Badge variant="outline" className="border-rose-200 text-rose-600 bg-rose-50 font-medium text-xs px-2.5 py-1 rounded-full flex-shrink-0">
-                        {room.available} Available
-                      </Badge>
-                      {isExpanded ? (
-                        <ChevronUp className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                      ) : (
-                        <ChevronDown className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                      )}
-                    </button>
+              <div className="space-y-3">
+                {profile.flatDetails.rooms.map((room) => {
+                  const isExpanded = expandedRooms.has(room.id);
+                  const roomName = room.name || `Room ${room.id}`;
+                  const roomType = room.type.charAt(0).toUpperCase() + room.type.slice(1);
+                  const validPhotos = getValidPhotos(room.photos);
+                  const activeIdx = getActiveIdx(room.id);
+                  const safeIdx = activeIdx < validPhotos.length ? activeIdx : 0;
 
-                    {/* Expanded content */}
+                  return (
                     <div
-                      className="grid transition-all duration-300 ease-in-out"
-                      style={{
-                        gridTemplateRows: isExpanded ? '1fr' : '0fr',
-                      }}
+                      key={room.id}
+                      className="rounded-xl border border-gray-200/70 overflow-hidden cursor-pointer hover:bg-gray-50/30 transition-colors"
+                      onClick={() => toggleRoom(room.id)}
                     >
-                      <div className="overflow-hidden">
-                        <div className="border-t border-border">
-                          {/* Two-column: large photo + details */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2">
-                            {/* Large photo */}
-                            <div className="aspect-[4/3] bg-muted">
-                              {room.photos[0] ? (
-                                <img src={room.photos[0]} alt={room.type} className="w-full h-full object-cover" />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <Home className="w-10 h-10 text-muted-foreground/30" />
-                                </div>
-                              )}
-                            </div>
+                      <div className="p-4 sm:px-5">
+                        <div className="flex gap-4" style={{ alignItems: isExpanded ? 'flex-start' : 'center' }}>
+                          {/* Image: morphs from 68px square to 240px tall */}
+                          <div
+                            className="rounded-xl bg-gray-100 flex-shrink-0 overflow-hidden transition-all duration-500 ease-in-out"
+                            style={{
+                              width: isExpanded ? 240 : 68,
+                              height: isExpanded ? 180 : 68,
+                            }}
+                          >
+                            {validPhotos[safeIdx] ? (
+                              <img src={validPhotos[safeIdx]} alt={roomName} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex flex-col items-center justify-center gap-1">
+                                <Home className={`text-gray-300 transition-all duration-300 ${isExpanded ? 'w-10 h-10' : 'w-5 h-5'}`} />
+                                {isExpanded && <span className="text-[11px] text-gray-300">No photos</span>}
+                              </div>
+                            )}
+                          </div>
 
-                            {/* Details */}
-                            <div className="p-4 space-y-4">
+                          {/* Content area */}
+                          <div className="flex-1 min-w-0">
+                            {/* Header row: always visible */}
+                            <div className="flex items-start justify-between">
                               <div>
-                                <h4 className="text-lg font-bold text-foreground">{room.type}</h4>
-                                <p className="text-sm text-muted-foreground">{room.available} units available</p>
-                              </div>
-
-                              <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                                <div>
-                                  <p className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
-                                    <IndianRupee className="w-3 h-3" /> Rent
-                                  </p>
-                                  <p className="font-semibold text-foreground">{room.rent}</p>
-                                </div>
-                                <div>
-                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Deposit</p>
-                                  <p className="font-semibold text-foreground">{room.securityDeposit}</p>
-                                </div>
-                                {room.brokerage && (
-                                  <div>
-                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Brokerage</p>
-                                    <p className="font-semibold text-foreground">{room.brokerage}</p>
+                                <h4 className={`font-bold text-gray-900 leading-tight transition-all duration-300 ${isExpanded ? 'text-[18px]' : 'text-[15px]'}`}>
+                                  {roomName}
+                                </h4>
+                                <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-[3px] rounded-full bg-gray-100 text-gray-600 font-medium mt-1.5">
+                                  <DoorOpen className="w-3 h-3 text-gray-400" />
+                                  {roomType}
+                                </span>
+                                {/* Rent line: hides smoothly when expanded */}
+                                <div
+                                  className="grid transition-[grid-template-rows] duration-500 ease-in-out"
+                                  style={{ gridTemplateRows: isExpanded ? '0fr' : '1fr' }}
+                                >
+                                  <div className="overflow-hidden">
+                                    <p className="text-[12px] text-gray-500 font-medium mt-1">
+                                      <span className="text-gray-700 font-semibold">Rent:</span> {room.rent}
+                                    </p>
                                   </div>
-                                )}
-                                <div>
-                                  <p className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
-                                    <Calendar className="w-3 h-3" /> Available From
-                                  </p>
-                                  <p className="font-semibold text-foreground">{room.availableFrom}</p>
                                 </div>
                               </div>
-                            </div>
-                          </div>
-
-                          {/* Room Amenities */}
-                          <div className="px-4 pb-3 space-y-2">
-                            <h6 className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Room Amenities</h6>
-                            <div className="flex flex-wrap gap-1.5">
-                              {room.amenities.map((amenity) => (
-                                <Badge key={amenity} variant="outline" className="text-xs font-normal rounded-full">
-                                  {amenity}
+                              {/* Badge + Chevron */}
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <Badge className="bg-rose-50 text-rose-600 border border-rose-200 text-[11px] font-semibold px-3 py-1 rounded-full hover:bg-rose-50">
+                                  {room.available} Available
                                 </Badge>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Room Photos */}
-                          {room.photos.length > 0 && (
-                            <div className="px-4 pb-4 space-y-2">
-                              <h6 className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Room Photos</h6>
-                              <div className="flex gap-2 overflow-x-auto pb-1">
-                                {room.photos.map((photo, idx) => (
-                                  <div key={idx} className="w-20 h-20 rounded-lg bg-muted flex-shrink-0 overflow-hidden">
-                                    {photo ? (
-                                      <img src={photo} alt={`${room.type} ${idx + 1}`} className="w-full h-full object-cover" />
-                                    ) : (
-                                      <div className="w-full h-full flex items-center justify-center">
-                                        <Home className="w-5 h-5 text-muted-foreground/30" />
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
+                                <ChevronDown className={`w-5 h-5 text-gray-400 flex-shrink-0 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
                               </div>
                             </div>
-                          )}
+
+                            {/* Expandable details: animated via grid */}
+                            <div
+                              className="grid transition-[grid-template-rows] duration-500 ease-in-out"
+                              style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
+                            >
+                              <div className="overflow-hidden">
+                                <div className="pt-4 space-y-4">
+                                  {/* 4-column grid: Rent | Deposit | Brokerage | Available From */}
+                                  <div className="grid grid-cols-4 gap-x-4 gap-y-3">
+                                    <div>
+                                      <p className="text-[10px] uppercase tracking-[0.1em] text-gray-400 font-bold flex items-center gap-1">
+                                        <IndianRupee className="w-3 h-3" /> RENT
+                                      </p>
+                                      <p className="text-[14px] font-bold text-gray-900 mt-0.5">{room.rent}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-[10px] uppercase tracking-[0.1em] text-gray-400 font-bold">DEPOSIT</p>
+                                      <p className={`text-[14px] font-bold mt-0.5 ${room.securityDeposit ? 'text-gray-900' : 'text-gray-400'}`}>
+                                        {room.securityDeposit || 'No Deposit'}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className="text-[10px] uppercase tracking-[0.1em] text-gray-400 font-bold">BROKERAGE</p>
+                                      <p className={`text-[14px] font-bold mt-0.5 ${room.brokerage ? 'text-gray-900' : 'text-gray-400'}`}>
+                                        {room.brokerage || 'No Brokerage'}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className="text-[10px] uppercase tracking-[0.1em] text-gray-400 font-bold flex items-center gap-1">
+                                        <Calendar className="w-3 h-3" /> AVAILABLE FROM
+                                      </p>
+                                      <p className="text-[14px] font-bold text-gray-900 mt-0.5">{room.availableFrom || 'Immediately'}</p>
+                                    </div>
+                                  </div>
+
+                                  {/* Room Amenities */}
+                                  {room.amenities.length > 0 && (
+                                    <div>
+                                      <p className="text-[10px] uppercase tracking-[0.1em] text-gray-400 font-bold mb-2">ROOM AMENITIES</p>
+                                      <div className="flex flex-wrap gap-2">
+                                        {room.amenities.map((a) => (
+                                          <span key={a} className="text-[12px] font-medium rounded-full px-3 py-[5px] bg-gray-100 text-gray-700 border border-gray-200/80">
+                                            {a}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Room Description */}
+                                  {room.description && (
+                                    <div>
+                                      <p className="text-[10px] uppercase tracking-[0.1em] text-gray-400 font-bold mb-1.5">ROOM DESCRIPTION</p>
+                                      <p className="text-[13px] text-gray-500 leading-relaxed">{room.description}</p>
+                                    </div>
+                                  )}
+
+                                  {/* Photo thumbnails */}
+                                  {validPhotos.length > 1 && (
+                                    <div className="flex gap-2">
+                                      {validPhotos.map((photo, idx) => (
+                                        <button
+                                          key={idx}
+                                          type="button"
+                                          onClick={(e) => { e.stopPropagation(); setActiveRoomPhoto((p) => ({ ...p, [room.id]: idx })); }}
+                                          className={`w-[72px] h-[52px] rounded-md flex-shrink-0 overflow-hidden border-2 transition-all ${
+                                            idx === safeIdx ? 'border-rose-500' : 'border-transparent hover:border-gray-300'
+                                          }`}
+                                        >
+                                          <img src={photo} alt="" className="w-full h-full object-cover" />
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Common Amenities & Photos */}
-            <div className="space-y-4">
-              <h4 className="font-semibold text-foreground">Common/Flat Amenities</h4>
-              <div className="flex flex-wrap gap-2">
-                {profile.flatDetails.commonAmenities.map((amenity) => (
-                  <Badge key={amenity} variant="secondary">
-                    {amenity}
-                  </Badge>
-                ))}
-              </div>
-
-              {/* Common Photos */}
-              {profile.flatDetails.commonPhotos.length > 0 && (
-                <div className="space-y-2">
-                  <h6 className="text-sm font-medium text-foreground">Common Area Photos</h6>
-                  <div className="grid grid-cols-3 gap-2">
-                    {profile.flatDetails.commonPhotos.map((photo, idx) => (
-                      <div key={idx} className="bg-muted aspect-video rounded-lg overflow-hidden">
-                        <img src={photo} alt={`Common Area ${idx + 1}`} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
+            {/* ──────── COMMON AREA ──────── */}
+            {(profile.flatDetails.commonAmenities.length > 0 || (profile.flatDetails.commonPhotos && profile.flatDetails.commonPhotos.filter(p => p && p.trim()).length > 0)) && (
+              <div className="space-y-3">
+                <h3 className="flex items-center gap-2.5 text-[14px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+                  <Home className="w-5 h-5 text-rose-500" />
+                  COMMON AREA
+                </h3>
+                {profile.flatDetails.commonAmenities.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {profile.flatDetails.commonAmenities.map((a) => (
+                      <span key={a} className="text-[12px] font-medium rounded-full px-3 py-[5px] bg-gray-50 text-gray-700 border border-gray-200">
+                        {a}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {profile.flatDetails.commonPhotos && profile.flatDetails.commonPhotos.filter(p => p && p.trim()).length > 0 && (
+                  <div className="flex gap-3 overflow-x-auto pb-1">
+                    {profile.flatDetails.commonPhotos.filter(p => p && p.trim()).map((photo, idx) => (
+                      <div key={idx} className="w-[240px] h-[180px] rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+                        <img src={photo} alt={`Common area ${idx + 1}`} className="w-full h-full object-cover" />
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
+
+            <div className="h-px bg-gray-100" />
           </div>
         )}
 
-        {/* My Habits & Looking For - Side by Side */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* My Habits */}
-          <div className="space-y-2">
-            <h3 className="text-lg font-semibold text-foreground">My Habits</h3>
+        {/* ──────── MY HABITS ──────── */}
+        {profile.myHabits.length > 0 && (
+          <div className="space-y-3">
+            <h3 className="flex items-center gap-2.5 text-[14px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+              <Heart className="w-5 h-5 text-rose-500" />
+              MY HABITS
+            </h3>
             <div className="flex flex-wrap gap-2">
               {profile.myHabits.map((habit) => {
                 const Icon = getHabitIcon(habit);
                 return (
-                  <Badge key={habit} variant="secondary" className="flex items-center gap-1.5">
-                    {Icon && <Icon className="w-3 h-3" />}
+                  <span key={habit} className="inline-flex items-center gap-1.5 text-[12px] font-medium rounded-full px-3 py-[5px] bg-gray-50 text-gray-700 border border-gray-200">
+                    {Icon && <Icon className="w-3.5 h-3.5 text-gray-400" />}
                     {habit}
-                  </Badge>
+                  </span>
                 );
               })}
             </div>
           </div>
+        )}
 
-          {/* Looking For Habits */}
-          <div className="space-y-2">
-            <h3 className="text-lg font-semibold text-foreground">Looking For in Flatmate</h3>
-            <div className="flex flex-wrap gap-2">
-              {profile.lookingForHabits.map((habit) => {
-                const Icon = getHabitIcon(habit);
-                return (
-                  <Badge key={habit} variant="default" className="flex items-center gap-1.5">
-                    {Icon && <Icon className="w-3 h-3" />}
-                    {habit}
-                  </Badge>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Work Experience */}
-        <div className="space-y-3">
-          <h3 className="text-lg font-semibold flex items-center gap-2 text-foreground">
-            <Briefcase className="h-5 w-5 text-primary" />
-            Work Experience
-          </h3>
-          {profile.jobExperiences.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No work experience added</p>
-          ) : (
-            <div className="space-y-3">
-              {profile.jobExperiences.map((experience, idx) => (
-                typeof experience === 'string' ? (
-                  <div key={idx} className="border rounded-lg p-3 space-y-1 bg-muted/30">
-                    <p className="text-sm font-medium text-foreground">{experience}</p>
-                  </div>
-                ) : (
-                  <div key={experience.id} className="border rounded-lg p-4 space-y-2 bg-muted/30">
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-1">
-                        <h4 className="font-semibold text-foreground">{experience.position}</h4>
-                        <p className="text-sm text-muted-foreground">{experience.company}</p>
+        {/* ──────── EXPERIENCE + EDUCATION (side by side) ──────── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1">
+          {/* Experience */}
+          <div className="space-y-3">
+            <h3 className="flex items-center gap-2.5 text-[14px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+              <Briefcase className="w-5 h-5 text-rose-500" />
+              EXPERIENCE
+            </h3>
+            {profile.jobExperiences.length === 0 ? (
+              <p className="text-[12px] text-gray-400 italic">Not provided</p>
+            ) : (
+              <div className="space-y-3">
+                {profile.jobExperiences.map((exp, idx) =>
+                  typeof exp === 'string' ? (
+                    <div key={idx} className="flex items-start gap-2.5">
+                      <div className="w-[7px] h-[7px] rounded-full bg-rose-400 mt-[7px] flex-shrink-0" />
+                      <p className="text-[13px] font-medium text-gray-700">{exp}</p>
+                    </div>
+                  ) : (
+                    <div key={exp.id} className="flex items-start gap-2.5">
+                      <div className="w-[7px] h-[7px] rounded-full bg-rose-400 mt-[7px] flex-shrink-0" />
+                      <div className="space-y-0.5">
+                        <p className="text-[13px] font-bold text-gray-900 leading-tight">{exp.position}</p>
+                        <p className="text-[12px] text-gray-500">{exp.company}</p>
+                        <p className="text-[11px] text-gray-400">{exp.fromYear} – {exp.currentlyWorking ? 'Present' : exp.tillYear}</p>
                       </div>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {experience.fromYear} - {experience.currentlyWorking ? 'Present' : experience.tillYear}
-                    </p>
-                  </div>
-                )
-              ))}
-            </div>
-          )}
-        </div>
+                  )
+                )}
+              </div>
+            )}
+          </div>
 
-        {/* Education */}
-        <div className="space-y-3">
-          <h3 className="text-lg font-semibold flex items-center gap-2 text-foreground">
-            <GraduationCap className="h-5 w-5 text-primary" />
-            Education
-          </h3>
-          {profile.educationExperiences.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No education added</p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {profile.educationExperiences.map((education, idx) => (
-                typeof education === 'string' ? (
-                  <div key={idx} className="border rounded-lg p-3 space-y-1 bg-muted/30">
-                    <p className="text-sm font-medium text-foreground">{education}</p>
-                  </div>
-                ) : (
-                  <div key={education.id} className="border rounded-lg p-4 space-y-2 bg-muted/30">
-                    <div className="space-y-1">
-                      <h4 className="font-semibold text-foreground">{education.degree}</h4>
-                      <p className="text-sm text-muted-foreground">{education.institution}</p>
+          {/* Education */}
+          <div className="space-y-3">
+            <h3 className="flex items-center gap-2.5 text-[14px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+              <GraduationCap className="w-5 h-5 text-rose-500" />
+              EDUCATION
+            </h3>
+            {profile.educationExperiences.length === 0 ? (
+              <p className="text-[12px] text-gray-400 italic">Not provided</p>
+            ) : (
+              <div className="space-y-3">
+                {profile.educationExperiences.map((edu, idx) =>
+                  typeof edu === 'string' ? (
+                    <div key={idx} className="flex items-start gap-2.5">
+                      <div className="w-[7px] h-[7px] rounded-full bg-rose-400 mt-[7px] flex-shrink-0" />
+                      <p className="text-[13px] font-medium text-gray-700">{edu}</p>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {education.startYear} - {education.endYear}
-                    </p>
-                  </div>
-                )
-              ))}
-            </div>
-          )}
+                  ) : (
+                    <div key={edu.id} className="flex items-start gap-2.5">
+                      <div className="w-[7px] h-[7px] rounded-full bg-rose-400 mt-[7px] flex-shrink-0" />
+                      <div className="space-y-0.5">
+                        <p className="text-[13px] font-bold text-gray-900 leading-tight">{edu.degree}</p>
+                        <p className="text-[12px] text-gray-500">{edu.institution}</p>
+                        <p className="text-[11px] text-gray-400">{edu.startYear} – {edu.endYear}</p>
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>
