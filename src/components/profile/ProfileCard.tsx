@@ -654,7 +654,6 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
               })}
             </div>
           </div>
-        </div>
 
         {/* ──────── EXPERIENCE + EDUCATION (side by side) ──────── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1">
