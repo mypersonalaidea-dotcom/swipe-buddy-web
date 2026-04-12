@@ -83,7 +83,7 @@ export const HomePage = () => {
     const isSaved = savedProfilesData.some(p => p.id === profileId);
 
     return {
-      id: profileId,
+      id: profileId, // Keep profile ID for saving/chatting
       name: flat.user?.name ?? "Unknown",
       age: flat.user?.age ?? 0,
       city: flat.city ?? "Unknown",
@@ -97,23 +97,27 @@ export const HomePage = () => {
       jobExperiences: flat.user?.workExperience ?? [],
       educationExperiences: flat.user?.education ?? [],
       flatDetails: {
-        id: flat.id, // Keep flat ID for reference
+        id: flat.id, // For flat-specific operations
         address: flat.address ?? "",
         coordinates: flat.latitude && flat.longitude
           ? [parseFloat(flat.longitude), parseFloat(flat.latitude)] as [number, number]
           : undefined,
+        flatType: flat.flat_type ?? "",
         furnishingType: flat.furnishing_type ?? "",
+        description: flat.description ?? "",
         commonAmenities: flat.common_amenities ?? [],
         commonPhotos: flat.media?.filter(m => m.media_type === "image").map(m => m.media_url) ?? [],
         rooms: (flat.rooms ?? []).map(r => ({
           id: r.id,
+          name: r.room_name || undefined,
           type: r.room_type,
           rent: `₹${Number(r.rent || 0).toLocaleString()}/mo`,
           available: r.available_count,
-          securityDeposit: `${r.security_deposit} mo`,
+          securityDeposit: `${r.security_deposit} Month`,
           brokerage: r.brokerage ? `${r.brokerage} days` : undefined,
           availableFrom: r.available_from ?? "",
           furnishingType: r.furnishing_type ?? flat.furnishing_type ?? "",
+          description: r.description ?? "",
           amenities: r.room_amenities ?? [],
           photos: r.media?.filter(m => m.media_type === "image").map(m => m.media_url) ?? [],
         })),
