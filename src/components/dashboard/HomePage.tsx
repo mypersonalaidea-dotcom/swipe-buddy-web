@@ -94,8 +94,8 @@ export const HomePage = () => {
       isSaved: isSaved,
       myHabits: flat.user?.user_habits ?? [],
       lookingForHabits: [] as string[],
-      jobExperiences: flat.user?.workExperience ?? [],
-      educationExperiences: flat.user?.education ?? [],
+      jobExperiences: (flat.user?.jobExperiencesDetailed?.length ? flat.user.jobExperiencesDetailed : flat.user?.workExperience) ?? [],
+      educationExperiences: (flat.user?.educationDetailed?.length ? flat.user.educationDetailed : flat.user?.education) ?? [],
       flatDetails: {
         id: flat.id, // For flat-specific operations
         address: flat.address ?? "",
@@ -113,8 +113,8 @@ export const HomePage = () => {
           type: r.room_type,
           rent: `₹${Number(r.rent || 0).toLocaleString()}/mo`,
           available: r.available_count,
-          securityDeposit: `${r.security_deposit} Month`,
-          brokerage: r.brokerage ? `${r.brokerage} days` : undefined,
+          securityDeposit: r.security_deposit ? `${r.security_deposit} Month` : '',
+          brokerage: r.brokerage ? `${r.brokerage} days` : '',
           availableFrom: r.available_from ?? "",
           furnishingType: r.furnishing_type ?? flat.furnishing_type ?? "",
           description: r.description ?? "",

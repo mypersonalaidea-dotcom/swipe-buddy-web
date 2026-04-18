@@ -12,6 +12,7 @@ import { MAPBOX_TOKEN, GOOGLE_MAPS_API_KEY, MAP_PROVIDER } from "@/lib/maps/conf
 import { GoogleMapRenderer } from "@/components/map/GoogleMapRenderer";
 import { MapboxMapRenderer } from "@/components/map/MapboxMapRenderer";
 import { getHabitIcon } from "@/constants/habits";
+import { PhotoGallery, GalleryGroup } from "@/components/profile/PhotoGallery";
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -142,6 +143,40 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
 
   const [expandedRooms, setExpandedRooms] = useState<Set<string>>(new Set());
   const [activeRoomPhoto, setActiveRoomPhoto] = useState<Record<string, number>>({});
+
+  // Photo gallery popup state
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryInitialGroup, setGalleryInitialGroup] = useState("");
+  const [galleryInitialPhoto, setGalleryInitialPhoto] = useState(0);
+
+  const openGallery = (groupId: string, photoIdx: number) => {
+    setGalleryInitialGroup(groupId);
+    setGalleryInitialPhoto(photoIdx);
+    setGalleryOpen(true);
+  };
+
+  // Build gallery groups from rooms + common area
+  const galleryGroups: GalleryGroup[] = [];
+  if (profile.flatDetails) {
+    profile.flatDetails.rooms.forEach((room, ri) => {
+      const photos = room.photos.filter(p => p && p.trim());
+      if (photos.length > 0) {
+        galleryGroups.push({
+          id: room.id,
+          label: room.name || `Room ${ri + 1}`,
+          photos,
+        });
+      }
+    });
+    const commonPhotos = (profile.flatDetails.commonPhotos || []).filter(p => p && p.trim());
+    if (commonPhotos.length > 0) {
+      galleryGroups.push({
+        id: "common-area",
+        label: "Common Area",
+        photos: commonPhotos,
+      });
+    }
+  }
 
   const hasExistingConversation = alreadyInConversation ?? conversationProfileIds.includes(profile.id);
 
@@ -455,7 +490,12 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                             }}
                           >
                             {validPhotos[safeIdx] ? (
-                              <img src={validPhotos[safeIdx]} alt={roomName} className="w-full h-full object-cover" />
+                              <img
+                                src={validPhotos[safeIdx]}
+                                alt={roomName}
+                                className="w-full h-full object-cover cursor-pointer"
+                                onClick={(e) => { e.stopPropagation(); if (galleryGroups.length > 0) openGallery(room.id, safeIdx); }}
+                              />
                             ) : (
                               <div className="w-full h-full flex flex-col items-center justify-center gap-1">
                                 <Home className={`text-gray-300 transition-all duration-300 ${isExpanded ? 'w-10 h-10' : 'w-5 h-5'}`} />
@@ -476,6 +516,17 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                                   <DoorOpen className="w-3 h-3 text-gray-400" />
                                   {roomType}
                                 </span>
+                                {/* Room description: only in expanded state */}
+                                <div
+                                  className="grid transition-[grid-template-rows] duration-500 ease-in-out"
+                                  style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
+                                >
+                                  <div className="overflow-hidden">
+                                    {room.description && (
+                                      <p className="text-[12px] text-gray-500 leading-relaxed mt-1.5">{room.description}</p>
+                                    )}
+                                  </div>
+                                </div>
                                 {/* Rent line: hides smoothly when expanded */}
                                 <div
                                   className="grid transition-[grid-template-rows] duration-500 ease-in-out"
@@ -546,13 +597,7 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                                     </div>
                                   )}
 
-                                  {/* Room Description */}
-                                  {room.description && (
-                                    <div>
-                                      <p className="text-[10px] uppercase tracking-[0.1em] text-gray-400 font-bold mb-1.5">ROOM DESCRIPTION</p>
-                                      <p className="text-[13px] text-gray-500 leading-relaxed">{room.description}</p>
-                                    </div>
-                                  )}
+
 
                                   {/* Photo thumbnails */}
                                   {validPhotos.length > 1 && (
@@ -562,6 +607,7 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                                           key={idx}
                                           type="button"
                                           onClick={(e) => { e.stopPropagation(); setActiveRoomPhoto((p) => ({ ...p, [room.id]: idx })); }}
+                                          onDoubleClick={(e) => { e.stopPropagation(); if (galleryGroups.length > 0) openGallery(room.id, idx); }}
                                           className={`w-[72px] h-[52px] rounded-md flex-shrink-0 overflow-hidden border-2 transition-all ${
                                             idx === safeIdx ? 'border-rose-500' : 'border-transparent hover:border-gray-300'
                                           }`}
@@ -602,7 +648,7 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                 {profile.flatDetails.commonPhotos && profile.flatDetails.commonPhotos.filter(p => p && p.trim()).length > 0 && (
                   <div className="flex gap-3 overflow-x-auto pb-1">
                     {profile.flatDetails.commonPhotos.filter(p => p && p.trim()).map((photo, idx) => (
-                      <div key={idx} className="w-[240px] h-[180px] rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+                      <div key={idx} className="w-[240px] h-[180px] rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 cursor-pointer" onClick={() => { if (galleryGroups.length > 0) openGallery('common-area', idx); }}>
                         <img src={photo} alt={`Common area ${idx + 1}`} className="w-full h-full object-cover" />
                       </div>
                     ))}
@@ -636,24 +682,6 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
           </div>
         )}
 
-          {/* Looking For Habits */}
-          <div className="space-y-3 mt-4">
-            <h3 className="flex items-center gap-2.5 text-[14px] font-semibold uppercase tracking-[0.08em] text-gray-500">
-              <Heart className="w-5 h-5 text-rose-500" />
-              LOOKING FOR
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {profile.lookingForHabits.map((habit) => {
-                const Icon = getHabitIcon(habit);
-                return (
-                  <span key={habit} className="inline-flex items-center gap-1.5 text-[12px] font-medium rounded-full px-3 py-[5px] bg-gray-50 text-gray-700 border border-gray-200">
-                    {Icon && <Icon className="w-3.5 h-3.5 text-gray-400" />}
-                    {habit}
-                  </span>
-                );
-              })}
-            </div>
-          </div>
 
         {/* ──────── EXPERIENCE + EDUCATION (side by side) ──────── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1">
@@ -666,24 +694,44 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
             {profile.jobExperiences.length === 0 ? (
               <p className="text-[12px] text-gray-400 italic">Not provided</p>
             ) : (
-              <div className="space-y-3">
-                {profile.jobExperiences.map((exp, idx) =>
-                  typeof exp === 'string' ? (
-                    <div key={idx} className="flex items-start gap-2.5">
-                      <div className="w-[7px] h-[7px] rounded-full bg-rose-400 mt-[7px] flex-shrink-0" />
-                      <p className="text-[13px] font-medium text-gray-700">{exp}</p>
-                    </div>
-                  ) : (
-                    <div key={exp.id} className="flex items-start gap-2.5">
-                      <div className="w-[7px] h-[7px] rounded-full bg-rose-400 mt-[7px] flex-shrink-0" />
-                      <div className="space-y-0.5">
-                        <p className="text-[13px] font-bold text-gray-900 leading-tight">{exp.position}</p>
-                        <p className="text-[12px] text-gray-500">{exp.company}</p>
-                        <p className="text-[11px] text-gray-400">{exp.fromYear} – {exp.currentlyWorking ? 'Present' : exp.tillYear}</p>
+              <div className="space-y-4">
+                {profile.jobExperiences.map((exp, idx) => {
+                  if (typeof exp === 'string') {
+                    // Format: "Position at Company | 2020 – Present"
+                    const [mainPart, yearsPart] = exp.split(' | ');
+                    const parts = mainPart.split(' at ');
+                    const position = parts[0];
+                    const company = parts.length > 1 ? parts.slice(1).join(' at ') : '';
+                    return (
+                    <div key={idx} className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 border border-gray-200/70">
+                        <Briefcase className="w-5 h-5 text-gray-400" />
+                      </div>
+                      <div className="space-y-0.5 min-w-0">
+                        <p className="text-[13px] font-bold text-gray-900 leading-tight">{position}</p>
+                        {company && <p className="text-[12px] text-gray-500">{company}</p>}
+                        {yearsPart && <p className="text-[11px] text-gray-400">{yearsPart}</p>}
                       </div>
                     </div>
-                  )
-                )}
+                    );
+                  }
+                  return (
+                    <div key={exp.id} className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center flex-shrink-0 border border-gray-200/70 overflow-hidden">
+                        {exp.companyLogo ? (
+                          <img src={exp.companyLogo} alt={exp.company} className="w-full h-full object-contain p-1" />
+                        ) : (
+                          <Briefcase className="w-5 h-5 text-gray-400" />
+                        )}
+                      </div>
+                      <div className="space-y-0.5 min-w-0">
+                        <p className="text-[13px] font-bold text-gray-900 leading-tight">{exp.position}</p>
+                        <p className="text-[12px] text-gray-500">{exp.company}{exp.currentlyWorking ? ' · Full-time' : ''}</p>
+                        <p className="text-[11px] text-gray-400">{exp.fromYear} – {exp.currentlyWorking ? 'Present' : exp.tillYear}{exp.fromYear && (exp.currentlyWorking || exp.tillYear) ? (() => { const from = parseInt(exp.fromYear); const to = exp.currentlyWorking ? new Date().getFullYear() : parseInt(exp.tillYear); const diff = to - from; return diff > 0 ? ` · ${diff} yr${diff > 1 ? 's' : ''}` : ''; })() : ''}</p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -697,29 +745,62 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
             {profile.educationExperiences.length === 0 ? (
               <p className="text-[12px] text-gray-400 italic">Not provided</p>
             ) : (
-              <div className="space-y-3">
-                {profile.educationExperiences.map((edu, idx) =>
-                  typeof edu === 'string' ? (
-                    <div key={idx} className="flex items-start gap-2.5">
-                      <div className="w-[7px] h-[7px] rounded-full bg-rose-400 mt-[7px] flex-shrink-0" />
-                      <p className="text-[13px] font-medium text-gray-700">{edu}</p>
-                    </div>
-                  ) : (
-                    <div key={edu.id} className="flex items-start gap-2.5">
-                      <div className="w-[7px] h-[7px] rounded-full bg-rose-400 mt-[7px] flex-shrink-0" />
-                      <div className="space-y-0.5">
-                        <p className="text-[13px] font-bold text-gray-900 leading-tight">{edu.degree}</p>
-                        <p className="text-[12px] text-gray-500">{edu.institution}</p>
-                        <p className="text-[11px] text-gray-400">{edu.startYear} – {edu.endYear}</p>
+              <div className="space-y-4">
+                {profile.educationExperiences.map((edu, idx) => {
+                  if (typeof edu === 'string') {
+                    // Format: "B.Tech from IIT Delhi | 2020 – 2024"
+                    const [mainPart, yearsPart] = edu.split(' | ');
+                    const parts = mainPart.split(' from ');
+                    const degree = parts[0];
+                    const institution = parts.length > 1 ? parts.slice(1).join(' from ') : '';
+                    return (
+                    <div key={idx} className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 border border-gray-200/70">
+                        <GraduationCap className="w-5 h-5 text-gray-400" />
+                      </div>
+                      <div className="space-y-0.5 min-w-0">
+                        <p className="text-[13px] font-bold text-gray-900 leading-tight">{institution || degree}</p>
+                        {institution && <p className="text-[12px] text-gray-500">{degree}</p>}
+                        {yearsPart && <p className="text-[11px] text-gray-400">{yearsPart}</p>}
                       </div>
                     </div>
-                  )
-                )}
+                    );
+                  }
+                  return (
+                    <div key={edu.id} className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center flex-shrink-0 border border-gray-200/70 overflow-hidden">
+                        {edu.institutionLogo ? (
+                          <img src={edu.institutionLogo} alt={edu.institution} className="w-full h-full object-contain p-1" />
+                        ) : (
+                          <GraduationCap className="w-5 h-5 text-gray-400" />
+                        )}
+                      </div>
+                      <div className="space-y-0.5 min-w-0">
+                        <p className="text-[13px] font-bold text-gray-900 leading-tight">{edu.institution}</p>
+                        <p className="text-[12px] text-gray-500">{edu.degree}</p>
+                        {(edu.startYear || edu.endYear) && (
+                          <p className="text-[11px] text-gray-400">{edu.startYear}{edu.startYear && edu.endYear ? ' – ' : ''}{edu.endYear}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
         </div>
       </CardContent>
+
+      {/* Photo Gallery Popup */}
+      {galleryOpen && galleryGroups.length > 0 && createPortal(
+        <PhotoGallery
+          groups={galleryGroups}
+          initialGroupId={galleryInitialGroup}
+          initialPhotoIndex={galleryInitialPhoto}
+          onClose={() => setGalleryOpen(false)}
+        />,
+        document.body
+      )}
     </Card>
   );
 };

@@ -39,6 +39,24 @@ export interface Flat {
     workExperience?: string[];
     education?: string[];
     user_habits?: string[];
+    jobExperiencesDetailed?: {
+      id: string;
+      position: string;
+      company: string;
+      companyLogo: string | null;
+      companyWebsite: string | null;
+      fromYear: string;
+      tillYear: string;
+      currentlyWorking: boolean;
+    }[];
+    educationDetailed?: {
+      id: string;
+      institution: string;
+      degree: string;
+      institutionLogo: string | null;
+      startYear: string;
+      endYear: string;
+    }[];
   };
   rooms: FlatRoom[];
   common_amenities: string[];
