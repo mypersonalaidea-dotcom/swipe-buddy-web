@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/sidebar/AppSidebar";
 import { HomePage } from "@/components/dashboard/HomePage";
 import { MessagePage } from "@/components/dashboard/MessagePage";
@@ -21,6 +21,19 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 export type DashboardView = "home" | "messages" | "profile" | "help";
+
+// Custom mobile trigger that hides itself when the sidebar is open
+const MobileNavTrigger = () => {
+  const { openMobile, isMobile } = useSidebar();
+  if (!isMobile || openMobile) return null;
+  return (
+    <div className="md:hidden fixed top-4 left-4 z-[100]">
+      <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md rounded-md p-0.5 shadow-sm border border-slate-200/50">
+         <SidebarTrigger className="w-8 h-8" />
+      </div>
+    </div>
+  );
+};
 
 const Dashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -147,8 +160,14 @@ const Dashboard = () => {
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-background">
-        <AppSidebar activeView={activeView} onViewChange={setActiveView} />
+      <div className="flex min-h-screen w-full bg-background relative">
+        <AppSidebar activeView={activeView} onViewChange={(view) => {
+          setActiveView(view);
+          setSearchParams(view === "home" ? {} : { activeView: view });
+        }} />
+        
+        <MobileNavTrigger />
+
         <main className="flex-1 overflow-auto">
           {renderContent()}
         </main>

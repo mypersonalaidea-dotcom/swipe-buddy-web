@@ -417,11 +417,11 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
           background: linear-gradient(180deg, transparent, hsl(220 13% 82%), transparent);
         }
         .gallery-divider-label {
-          font-size: 9px;
+          font-size: 10px;
           font-weight: 800;
           text-transform: uppercase;
-          letter-spacing: 0.12em;
-          color: hsl(220 10% 58%);
+          letter-spacing: 0.1em;
+          color: hsl(220 10% 30%);
           white-space: nowrap;
         }
 

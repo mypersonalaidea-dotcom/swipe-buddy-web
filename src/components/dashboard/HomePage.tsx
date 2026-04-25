@@ -393,7 +393,7 @@ export const HomePage = () => {
   return (
     <div className="h-screen flex flex-col relative">
       {/* Floating Filter Button */}
-      <Button onClick={() => setIsFilterOpen(true)} className="absolute top-4 left-4 z-20 shadow-lg" variant="default">
+      <Button onClick={() => setIsFilterOpen(true)} className="absolute top-4 right-4 md:left-4 md:right-auto z-20 shadow-lg" variant="default">
         <SlidersHorizontal className="w-4 h-4 mr-2" />
         Filters
       </Button>

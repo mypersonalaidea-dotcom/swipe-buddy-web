@@ -4,7 +4,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   MapPin, Briefcase, GraduationCap, Home, Send, Heart, Bookmark,
-  ExternalLink, ChevronDown, DoorOpen, Calendar, Sofa, IndianRupee, Smile
+  ExternalLink, ChevronDown, DoorOpen, Calendar, Sofa, IndianRupee, Smile,
+  Snowflake, Wifi, Bath, ShowerHead, Tv, Fan, UtensilsCrossed, Dumbbell,
+  Car, Zap, Waves, WashingMachine, Armchair, Lamp, Lock, Refrigerator,
+  type LucideIcon
 } from "lucide-react";
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
@@ -96,6 +99,41 @@ interface ProfileCardProps {
 }
 
 const conversationProfileIds = ["1", "3"];
+
+/* ── Amenity → Icon mapping ── */
+const amenityIconMap: Record<string, LucideIcon> = {
+  'AC': Snowflake,
+  'Air Conditioning': Snowflake,
+  'WiFi': Wifi,
+  'Wi-Fi': Wifi,
+  'Attached Bathroom': Bath,
+  'Bathroom': Bath,
+  'Geyser': ShowerHead,
+  'TV': Tv,
+  'Television': Tv,
+  'Fan': Fan,
+  'Ceiling Fan': Fan,
+  'Kitchen': UtensilsCrossed,
+  'Gym': Dumbbell,
+  'Parking': Car,
+  'Power Backup': Zap,
+  'Balcony': Waves,
+  'Washing Machine': WashingMachine,
+  'Wardrobe': Armchair,
+  'Cupboard': Armchair,
+  'Lift': DoorOpen,
+  'Elevator': DoorOpen,
+  'Desk': Lamp,
+  'Study Table': Lamp,
+  'Security': Lock,
+  'Fridge': Refrigerator,
+  'Refrigerator': Refrigerator,
+  'Sofa': Sofa,
+  'Furnished': Sofa,
+};
+const getAmenityIcon = (amenity: string): LucideIcon | null => {
+  return amenityIconMap[amenity] || null;
+};
 
 const flatTypeLabels: Record<string, string> = {
   '1rk': '1 RK', '1bhk': '1 BHK', '2bhk': '2 BHK',
@@ -587,12 +625,16 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                                   {room.amenities.length > 0 && (
                                     <div>
                                       <p className="text-[10px] uppercase tracking-[0.1em] text-gray-400 font-bold mb-2">ROOM AMENITIES</p>
-                                      <div className="flex flex-wrap gap-2">
-                                        {room.amenities.map((a) => (
-                                          <span key={a} className="text-[12px] font-medium rounded-full px-3 py-[5px] bg-gray-100 text-gray-700 border border-gray-200/80">
-                                            {a}
-                                          </span>
-                                        ))}
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {room.amenities.map((a) => {
+                                          const AmenityIcon = getAmenityIcon(a);
+                                          return (
+                                            <span key={a} className="inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-lg px-2.5 py-[5px] bg-gradient-to-b from-white to-gray-50 text-gray-700 border border-gray-200/80 shadow-[0_1px_2px_hsl(220_13%_91%/0.5)]">
+                                              {AmenityIcon && <AmenityIcon className="w-3.5 h-3.5 text-rose-400" />}
+                                              {a}
+                                            </span>
+                                          );
+                                        })}
                                       </div>
                                     </div>
                                   )}
@@ -637,12 +679,16 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                   COMMON AREA
                 </h3>
                 {profile.flatDetails.commonAmenities.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {profile.flatDetails.commonAmenities.map((a) => (
-                      <span key={a} className="text-[12px] font-medium rounded-full px-3 py-[5px] bg-gray-50 text-gray-700 border border-gray-200">
-                        {a}
-                      </span>
-                    ))}
+                  <div className="flex flex-wrap gap-1.5">
+                    {profile.flatDetails.commonAmenities.map((a) => {
+                      const AmenityIcon = getAmenityIcon(a);
+                      return (
+                        <span key={a} className="inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-lg px-2.5 py-[5px] bg-gradient-to-b from-white to-gray-50 text-gray-700 border border-gray-200/80 shadow-[0_1px_2px_hsl(220_13%_91%/0.5)]">
+                          {AmenityIcon && <AmenityIcon className="w-3.5 h-3.5 text-rose-400" />}
+                          {a}
+                        </span>
+                      );
+                    })}
                   </div>
                 )}
                 {profile.flatDetails.commonPhotos && profile.flatDetails.commonPhotos.filter(p => p && p.trim()).length > 0 && (
@@ -703,8 +749,8 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                     const position = parts[0];
                     const company = parts.length > 1 ? parts.slice(1).join(' at ') : '';
                     return (
-                    <div key={idx} className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 border border-gray-200/70">
+                    <div key={idx} className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 border border-gray-200/70">
                         <Briefcase className="w-5 h-5 text-gray-400" />
                       </div>
                       <div className="space-y-0.5 min-w-0">
@@ -716,10 +762,10 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                     );
                   }
                   return (
-                    <div key={exp.id} className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center flex-shrink-0 border border-gray-200/70 overflow-hidden">
+                    <div key={exp.id} className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-lg bg-gray-50 flex items-center justify-center flex-shrink-0 border border-gray-200/70 overflow-hidden">
                         {exp.companyLogo ? (
-                          <img src={exp.companyLogo} alt={exp.company} className="w-full h-full object-contain p-1" />
+                          <img src={exp.companyLogo} alt={exp.company} className="w-full h-full object-contain" />
                         ) : (
                           <Briefcase className="w-5 h-5 text-gray-400" />
                         )}
@@ -754,8 +800,8 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                     const degree = parts[0];
                     const institution = parts.length > 1 ? parts.slice(1).join(' from ') : '';
                     return (
-                    <div key={idx} className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 border border-gray-200/70">
+                    <div key={idx} className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 border border-gray-200/70">
                         <GraduationCap className="w-5 h-5 text-gray-400" />
                       </div>
                       <div className="space-y-0.5 min-w-0">
@@ -767,10 +813,10 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                     );
                   }
                   return (
-                    <div key={edu.id} className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center flex-shrink-0 border border-gray-200/70 overflow-hidden">
+                    <div key={edu.id} className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-lg bg-gray-50 flex items-center justify-center flex-shrink-0 border border-gray-200/70 overflow-hidden">
                         {edu.institutionLogo ? (
-                          <img src={edu.institutionLogo} alt={edu.institution} className="w-full h-full object-contain p-1" />
+                          <img src={edu.institutionLogo} alt={edu.institution} className="w-full h-full object-contain" />
                         ) : (
                           <GraduationCap className="w-5 h-5 text-gray-400" />
                         )}

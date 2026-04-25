@@ -1,4 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { format } from "date-fns";
+import api from "@/lib/api";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
 import { habitCategories, getCategoryForHabit, getHabitIcon } from "@/constants/habits";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -7,11 +14,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { BrandMultiSelect, BrandOption } from "@/components/ui/brand-multi-select";
 import {
@@ -23,7 +33,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   User, Phone, Mail, Briefcase, BookOpen, Home, MapPin,
-  Edit2, Save, X, Plus, Trash2, Camera, Heart, Bookmark, Share2, Copy, Check, DoorOpen, Building2, Loader2, Calendar
+  Edit2, Save, X, Plus, Trash2, Camera, Heart, Bookmark, Share2, Copy, Check, DoorOpen, Building2, Loader2, Calendar, ShieldCheck
 } from "lucide-react";
 import { MediaUpload } from "@/components/ui/media-upload";
 import { MapPicker } from "@/components/map/MapPicker";
@@ -81,9 +91,12 @@ interface UserProfile {
   // Personal Info
   name: string;
   age: string;
+  dob: string;
   gender: string;
   phone: string;
+  phoneVerified: boolean;
   email: string;
+  emailVerified: boolean;
   city: string;
   state: string;
   profilePictureUrl: string;
@@ -113,7 +126,7 @@ interface UserProfile {
 
 // API-backed profile placeholder (populated via useEffect once data loads)
 const emptyProfile: UserProfile = {
-  name: "", age: "", gender: "", phone: "", email: "",
+  name: "", age: "", dob: "", gender: "", phone: "", phoneVerified: false, email: "", emailVerified: false,
   city: "", state: "", profilePictureUrl: "",
   jobExperiences: [], educationExperiences: [],
   searchType: "flat",
@@ -245,9 +258,12 @@ export const ProfilePage = () => {
     return {
       name: apiProfile?.name ?? "",
       age: apiProfile?.age?.toString() ?? "",
+      dob: (apiProfile as any)?.date_of_birth ?? "",
       gender: apiProfile?.gender ?? "",
       phone: apiProfile?.phone ?? "",
+      phoneVerified: apiProfile?.phone_verified ?? false,
       email: apiProfile?.email ?? "",
+      emailVerified: apiProfile?.email_verified ?? false,
       city: apiProfile?.city ?? "",
       state: apiProfile?.state ?? "",
       profilePictureUrl: apiProfile?.profile_picture_url ?? "",
@@ -286,12 +302,38 @@ export const ProfilePage = () => {
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
 
+  // ── OTP Verification State (same as signup form) ──
+  const OTP_MODE = (import.meta as any).env?.VITE_OTP_MODE || "hardcoded";
+  const HARDCODED_OTP = "123456";
+  const [otpDialogOpen, setOtpDialogOpen] = useState(false);
+  const [otpValue, setOtpValue] = useState("");
+  const [otpType, setOtpType] = useState<"phone" | "email">("phone");
+  const [otpCountdown, setOtpCountdown] = useState(0);
+  const [otpError, setOtpError] = useState("");
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [verifyLoading, setVerifyLoading] = useState("");
+  const countryCode = "+91";
+
+  // Track original verified phone/email to detect changes
+  const [originalVerifiedPhone, setOriginalVerifiedPhone] = useState("");
+  const [originalVerifiedEmail, setOriginalVerifiedEmail] = useState("");
+
+  // Countdown timer for OTP resend
+  useEffect(() => {
+    if (otpCountdown <= 0) return;
+    const timer = setTimeout(() => setOtpCountdown(otpCountdown - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [otpCountdown]);
+
   // Sync API data into local state once loaded
   useEffect(() => {
     if (apiProfile) {
       const local = apiToLocal();
       setProfile(local);
       setEditedProfile(local);
+      // Track original verified values for change detection
+      if (local.phoneVerified) setOriginalVerifiedPhone(local.phone);
+      if (local.emailVerified) setOriginalVerifiedEmail(local.email);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiProfile, apiJobs, apiEducation, apiHabits]);
@@ -372,9 +414,14 @@ export const ProfilePage = () => {
     toggleSaveMutation(profileId);
   };
 
+
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 50 }, (_, i) => (currentYear - i).toString());
   const futureYears = Array.from({ length: 11 }, (_, i) => (currentYear + i).toString());
+
+  // DOB picker state (moved to component level to avoid hooks-in-IIFE crash)
+  const [dobView, setDobView] = useState<'year' | 'month' | 'day'>('day');
+  const [dobNavMonth, setDobNavMonth] = useState<Date>(new Date(currentYear - 25, 0));
 
   const handleEdit = () => {
     setEditedProfile({ ...profile });
@@ -392,12 +439,13 @@ export const ProfilePage = () => {
       await updateProfileMutation.mutateAsync({
         name: editedProfile.name,
         age: editedProfile.age ? parseInt(editedProfile.age) as any : undefined,
+        date_of_birth: editedProfile.dob || undefined,
         gender: editedProfile.gender as any,
         city: editedProfile.city,
         state: editedProfile.state,
         search_type: editedProfile.searchType as any,
         move_in_date: editedProfile.propertyMoveInDate || undefined,
-      });
+      } as any);
 
       // 2. Sync jobs: delete removed, update existing, add new
       const origJobIds = (apiJobs ?? []).map(j => j.id);
@@ -678,38 +726,518 @@ export const ProfilePage = () => {
 
   const data = isEditing ? editedProfile : profile;
 
+  // ── OTP Verification Handlers (same logic as signup form) ──
+  const openOtpDialog = (type: "phone" | "email") => {
+    setOtpType(type);
+    setOtpValue("");
+    setOtpError("");
+    setOtpDialogOpen(true);
+    setOtpCountdown(30);
+    const target = type === "phone" ? `${countryCode} ${data.phone}` : data.email;
+    toast({ title: type === "phone" ? "OTP Sent! 📱" : "OTP Sent! 📧", description: `Verification code sent to ${target}` });
+  };
+
+  const handleOtpVerify = async () => {
+    if (otpValue.length !== 6) { setOtpError("Please enter the complete 6-digit OTP"); return; }
+    setOtpVerifying(true);
+    setOtpError("");
+    try {
+      if (OTP_MODE === "hardcoded") {
+        if (otpValue === HARDCODED_OTP) {
+          if (otpType === "phone") {
+            updateField('phoneVerified', true as any);
+            setOriginalVerifiedPhone(data.phone);
+            toast({ title: "Phone Verified! ✅", description: "Your phone number has been verified successfully." });
+          } else {
+            updateField('emailVerified', true as any);
+            setOriginalVerifiedEmail(data.email);
+            toast({ title: "Email Verified! ✅", description: "Your email has been verified successfully." });
+          }
+          setOtpDialogOpen(false);
+        } else {
+          setOtpError("Invalid OTP. Please try again.");
+        }
+      } else {
+        if (otpType === "phone") {
+          const res = await api.post("/auth/verify-otp", { phone: data.phone, otp: otpValue });
+          if (res.data?.success || res.data?.data?.verified) {
+            updateField('phoneVerified', true as any);
+            setOriginalVerifiedPhone(data.phone);
+            toast({ title: "Phone Verified! ✅", description: "Your phone number has been verified successfully." });
+            setOtpDialogOpen(false);
+          } else { setOtpError(res.data?.message || "Invalid OTP. Please try again."); }
+        } else {
+          const res = await api.post("/auth/verify-email-otp", { email: data.email, otp: otpValue });
+          if (res.data?.success || res.data?.data?.verified) {
+            updateField('emailVerified', true as any);
+            setOriginalVerifiedEmail(data.email);
+            toast({ title: "Email Verified! ✅", description: "Your email has been verified successfully." });
+            setOtpDialogOpen(false);
+          } else { setOtpError(res.data?.message || "Invalid OTP. Please try again."); }
+        }
+      }
+    } catch (err: any) {
+      setOtpError(err?.response?.data?.message || err?.friendlyMessage || "Verification failed. Please try again.");
+    } finally { setOtpVerifying(false); }
+  };
+
+  const handleResendOtp = async () => {
+    if (otpCountdown > 0) return;
+    setOtpValue(""); setOtpError("");
+    if (OTP_MODE === "hardcoded") {
+      setOtpCountdown(30);
+      toast({ title: "OTP Resent! 🔄", description: `Use code ${HARDCODED_OTP} to verify (dev mode)` });
+      return;
+    }
+    try {
+      if (otpType === "phone") { await api.post("/auth/send-otp", { phone: data.phone }); }
+      else { await api.post("/auth/check-email", { email: data.email }); }
+      setOtpCountdown(30);
+      toast({ title: "OTP Resent! 🔄", description: `New verification code sent to ${otpType === "phone" ? `${countryCode} ${data.phone}` : data.email}` });
+    } catch (err: any) {
+      toast({ title: "Resend Failed", description: err?.response?.data?.message || "Failed to resend OTP. Please try again.", variant: "destructive" });
+    }
+  };
+
+  const handleVerifyPhone = async () => {
+    if (!data.phone || data.phone.length !== 10) {
+      toast({ title: "Error", description: "Please enter a valid 10-digit phone number", variant: "destructive" });
+      return;
+    }
+    if (OTP_MODE === "hardcoded") { openOtpDialog("phone"); return; }
+    setVerifyLoading("phone");
+    try {
+      await api.post("/auth/send-otp", { phone: data.phone });
+      setVerifyLoading("");
+    } catch (error: any) {
+      setVerifyLoading("");
+      console.warn("Phone OTP send failed:", error);
+    }
+    openOtpDialog("phone");
+  };
+
+  const handleVerifyEmail = async () => {
+    if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+      toast({ title: "Error", description: "Please enter a valid email address", variant: "destructive" });
+      return;
+    }
+    if (OTP_MODE === "hardcoded") { openOtpDialog("email"); return; }
+    setVerifyLoading("email");
+    try {
+      await api.post("/auth/check-email", { email: data.email });
+      setVerifyLoading("");
+      openOtpDialog("email");
+    } catch (err: any) {
+      setVerifyLoading("");
+      toast({ title: "Error", description: err?.response?.data?.message || "Failed to send verification email.", variant: "destructive" });
+    }
+  };
+
+  // Compute verification status: verified if API says so AND value hasn't changed
+  const isPhoneVerified = data.phoneVerified && data.phone === originalVerifiedPhone;
+  const isEmailVerified = data.emailVerified && data.email === originalVerifiedEmail;
+
+  // ── Sparkle cursor trail — directional ray, background-only ──
+  const sparkleCanvasRef = useRef<HTMLCanvasElement>(null);
+  const sparklesRef = useRef<Array<{
+    x: number; y: number; vx: number; vy: number;
+    life: number; maxLife: number; size: number;
+    color: string; type: 'dot' | 'star';
+  }>>([]);
+  const mouseRef = useRef({ x: 0, y: 0, prevX: 0, prevY: 0, moving: false });
+  const animFrameRef = useRef<number>(0);
+
+  const isInContentArea = useCallback((x: number, canvasWidth: number) => {
+    // max-w-4xl = 896px, centered. Calculate the content column bounds.
+    const contentWidth = Math.min(896, canvasWidth);
+    const contentLeft = (canvasWidth - contentWidth) / 2;
+    const contentRight = contentLeft + contentWidth;
+    return x >= contentLeft && x <= contentRight;
+  }, []);
+
+  useEffect(() => {
+    const canvas = sparkleCanvasRef.current;
+    if (!canvas) return;
+    if (window.innerWidth < 1024) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const resize = () => {
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      mouseRef.current.prevX = mouseRef.current.x;
+      mouseRef.current.prevY = mouseRef.current.y;
+      mouseRef.current.x = e.clientX - rect.left;
+      mouseRef.current.y = e.clientY - rect.top;
+      mouseRef.current.moving = true;
+    };
+    const handleMouseLeave = () => { mouseRef.current.moving = false; };
+
+    canvas.parentElement?.addEventListener('mousemove', handleMouseMove);
+    canvas.parentElement?.addEventListener('mouseleave', handleMouseLeave);
+
+    const colors = [
+      'rgba(225, 29, 72, 0.7)',
+      'rgba(244, 63, 94, 0.6)',
+      'rgba(251, 113, 133, 0.5)',
+      'rgba(255, 228, 230, 0.8)',
+      'rgba(255, 255, 255, 0.8)',
+      'rgba(253, 186, 116, 0.5)',
+    ];
+
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const m = mouseRef.current;
+
+      // Only spawn if moving AND cursor is in the side background area
+      if (m.moving && !isInContentArea(m.x, canvas.width)) {
+        const dx = m.x - m.prevX;
+        const dy = m.y - m.prevY;
+        const speed = Math.sqrt(dx * dx + dy * dy);
+        if (speed > 1) {
+          // Sparkle drops from the cursor tip (top-left hotspot)
+          // Nearly stationary — just drifts gently downward to form a trail
+          sparklesRef.current.push({
+            x: m.x + (Math.random() - 0.5) * 3,
+            y: m.y + (Math.random() - 0.5) * 3,
+            vx: (Math.random() - 0.5) * 0.3,
+            vy: 0.2 + Math.random() * 0.4, // gentle fall
+            life: 1,
+            maxLife: 0.5 + Math.random() * 0.5,
+            size: 1.2 + Math.random() * 2,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            type: Math.random() > 0.5 ? 'star' : 'dot',
+          });
+        }
+      }
+
+      // Update & draw particles
+      sparklesRef.current = sparklesRef.current.filter(p => {
+        p.life -= 0.016 / p.maxLife;
+        if (p.life <= 0) return false;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vx *= 0.97;
+        p.vy *= 0.97;
+        const alpha = p.life * p.life; // quadratic fade for softer tail
+        const size = p.size * alpha;
+
+        ctx.save();
+        ctx.globalAlpha = alpha;
+
+        if (p.type === 'dot') {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+          ctx.fillStyle = p.color;
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = size * 4;
+          ctx.fill();
+        } else {
+          // Tiny 4-point star
+          const s = size * 1.3;
+          ctx.translate(p.x, p.y);
+          ctx.beginPath();
+          for (let i = 0; i < 4; i++) {
+            const ang = (i / 4) * Math.PI * 2 - Math.PI / 4;
+            ctx.lineTo(Math.cos(ang) * s, Math.sin(ang) * s);
+            const mid = ang + Math.PI / 4;
+            ctx.lineTo(Math.cos(mid) * s * 0.35, Math.sin(mid) * s * 0.35);
+          }
+          ctx.closePath();
+          ctx.fillStyle = p.color;
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = s * 3;
+          ctx.fill();
+        }
+
+        ctx.restore();
+        return true;
+      });
+
+      animFrameRef.current = requestAnimationFrame(animate);
+    };
+    animFrameRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      cancelAnimationFrame(animFrameRef.current);
+      window.removeEventListener('resize', resize);
+      canvas.parentElement?.removeEventListener('mousemove', handleMouseMove);
+      canvas.parentElement?.removeEventListener('mouseleave', handleMouseLeave);
+    };
+  }, [isInContentArea]);
+
   return (
-    <div className="min-h-screen p-4 md:p-8 bg-background">
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Your Profile</h1>
-            <p className="text-muted-foreground">View and manage your profile details</p>
+    <div className="min-h-screen relative" style={{ background: 'linear-gradient(160deg, #fff5f5 0%, #fef2f2 25%, #fce4ec 60%, #fbe9e7 100%)' }}>
+      {/* Sparkle cursor trail canvas */}
+      <canvas ref={sparkleCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-20 hidden lg:block" />
+
+      {/* Dot pattern overlay */}
+      <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'radial-gradient(rgba(225, 29, 72, 0.06) 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
+
+      {/* ── Geometric shapes (desktop only, subtle) ── */}
+      {/* Top-right: nested rotating squares */}
+      <div className="absolute top-[6%] right-[6%] w-24 h-24 border-2 border-rose-400/20 rounded-xl profile-spin-slow hidden lg:block" />
+      <div className="absolute top-[8%] right-[8%] w-16 h-16 border-2 border-rose-300/15 rounded-lg profile-spin-slow hidden lg:block" style={{ animationDirection: 'reverse' }} />
+
+      {/* Bottom-left: concentric pulsing rings */}
+      <div className="absolute bottom-[12%] left-[4%] w-28 h-28 border-2 border-rose-400/15 rounded-full profile-pulse-ring hidden lg:block" />
+      <div className="absolute bottom-[14%] left-[6%] w-20 h-20 border-2 border-rose-300/10 rounded-full profile-pulse-ring hidden lg:block" style={{ animationDelay: '1.5s' }} />
+
+      {/* Top-left: rotating diamond */}
+      <div className="absolute top-[18%] left-[6%] w-14 h-14 border-2 border-rose-400/15 rotate-45 profile-spin-slow hidden lg:block" style={{ animationDuration: '35s' }} />
+
+      {/* Bottom-right: small rotating square */}
+      <div className="absolute bottom-[20%] right-[7%] w-10 h-10 border-2 border-rose-300/20 rounded-md profile-spin-slow hidden lg:block" style={{ animationDirection: 'reverse', animationDuration: '20s' }} />
+
+      {/* Floating dots */}
+      <div className="absolute top-[35%] right-[5%] w-3.5 h-3.5 bg-rose-400/25 rounded-full profile-drift hidden lg:block" />
+      <div className="absolute top-[15%] left-[15%] w-3 h-3 bg-rose-500/15 rounded-full profile-drift hidden lg:block" style={{ animationDelay: '2s' }} />
+      <div className="absolute bottom-[25%] right-[15%] w-2.5 h-2.5 bg-rose-400/20 rounded-full profile-drift hidden lg:block" style={{ animationDelay: '4s' }} />
+      <div className="absolute top-[55%] left-[4%] w-3 h-3 bg-pink-400/20 rounded-full profile-drift hidden lg:block" style={{ animationDelay: '6s' }} />
+      <div className="absolute bottom-[8%] left-[35%] w-2 h-2 bg-rose-500/15 rounded-full profile-drift hidden lg:block" style={{ animationDelay: '3s' }} />
+      <div className="absolute top-[75%] right-[3%] w-2.5 h-2.5 bg-rose-300/25 rounded-full profile-drift hidden lg:block" style={{ animationDelay: '5s' }} />
+
+      {/* Floating diamonds */}
+      <div className="absolute top-[45%] right-[4%] profile-float-anim hidden lg:block">
+        <div className="w-5 h-5 border-2 border-rose-400/20 rotate-45" />
+      </div>
+      <div className="absolute bottom-[40%] left-[3%] profile-float-anim hidden lg:block" style={{ animationDelay: '2s' }}>
+        <div className="w-4 h-4 border-2 border-rose-300/15 rotate-45" />
+      </div>
+      <div className="absolute top-[10%] left-[40%] profile-float-anim hidden lg:block" style={{ animationDelay: '4s' }}>
+        <div className="w-3 h-3 border border-rose-400/15 rotate-45" />
+      </div>
+
+      {/* Soft glowing orbs */}
+      <div className="absolute top-[10%] left-[8%] w-64 h-64 rounded-full bg-rose-200/20 profile-orb hidden lg:block" style={{ filter: 'blur(80px)' }} />
+      <div className="absolute bottom-[15%] right-[5%] w-48 h-48 rounded-full bg-pink-200/15 profile-orb hidden lg:block" style={{ filter: 'blur(80px)', animationDelay: '3s' }} />
+
+      <style dangerouslySetInnerHTML={{ __html: profileGeoStyles }} />
+
+      <div className="relative z-10 max-w-4xl mx-auto">
+        {/* ── Premium hero banner with wave edge (Restrained Width) ── */}
+        <div className="relative h-[160px] overflow-hidden rounded-b-3xl" style={{ background: 'linear-gradient(135deg, hsl(346 77% 46%) 0%, hsl(346 77% 56%) 40%, hsl(330 72% 58%) 70%, hsl(320 68% 62%) 100%)' }}>
+          {/* Dot pattern */}
+          <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '16px 16px' }} />
+          {/* Animated orbs inside banner */}
+          <div className="absolute top-4 right-[10%] w-32 h-32 rounded-full bg-white/[0.08] blur-xl profile-drift" />
+          <div className="absolute -bottom-4 left-[10%] w-24 h-24 rounded-full bg-white/[0.06] blur-lg profile-drift" style={{ animationDelay: '3s' }} />
+          
+          {/* Banner tagline — stylish wide typography */}
+          <div className="relative z-10 flex flex-col items-center justify-start h-full pt-5 md:pt-7 px-10 md:px-6">
+            {/* Decorative line + main headline */}
+            <div className="flex items-center gap-2 md:gap-4 w-full">
+              <div className="hidden sm:block flex-1 h-px bg-gradient-to-r from-transparent via-white/50 to-white/20" />
+              <h1 className="text-white text-[12.5px] sm:text-[15px] md:text-[24px] font-extrabold tracking-wide text-center leading-snug w-full" style={{ textShadow: '0 2px 16px rgba(0,0,0,0.18)' }}>
+                Find flatmates you'll <span className="italic font-light opacity-90 mx-0.5 md:mx-1">actually</span> get along with
+              </h1>
+              <div className="hidden sm:block flex-1 h-px bg-gradient-to-l from-transparent via-white/50 to-white/20" />
+            </div>
+            {/* Subtitle */}
+            <p className="text-white/80 text-[10px] md:text-sm mt-1 sm:mt-2 md:mt-3 font-medium tracking-wide">
+              A complete profile gets 3× more messages ✨
+            </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setIsShareDialogOpen(true)}>
-              <Share2 className="w-4 h-4 mr-2" />
-              Share
-            </Button>
-            {isEditing ? (
-              <>
-                <Button variant="outline" onClick={handleCancel}>
-                  <X className="w-4 h-4 mr-2" />
-                  Cancel
-                </Button>
-                <Button onClick={handleSave}>
-                  <Save className="w-4 h-4 mr-2" />
-                  Save Changes
-                </Button>
-              </>
-            ) : (
-              <Button onClick={handleEdit}>
-                <Edit2 className="w-4 h-4 mr-2" />
-                Edit Profile
-              </Button>
+          {/* Wave bottom edge */}
+          <svg className="absolute bottom-0 left-0 w-full" viewBox="0 0 1440 50" preserveAspectRatio="none" style={{ height: '28px' }}>
+            <path d="M0,20 C360,45 720,0 1080,25 C1260,37 1380,20 1440,20 L1440,50 L0,50 Z" fill="#fff5f5" />
+          </svg>
+        </div>
+        {/* ── Profile card — overlaps banner ── */}
+        <div className="relative -mt-16 mx-4 md:mx-8 mb-6 bg-white rounded-2xl border border-gray-200/60 shadow-[0_10px_40px_-10px_hsl(240_10%_15%/0.1)] p-6">
+          <div className="flex flex-col md:flex-row items-center gap-5">
+            {/* Avatar — rounded square matching ProfileCard */}
+            <div className="relative -mt-16 md:-mt-12 flex-shrink-0">
+              <div className="w-[120px] h-[120px] rounded-[28px] border-4 border-white shadow-lg overflow-hidden bg-gray-100 ring-2 ring-rose-400/30">
+                {data.profilePictureUrl ? (
+                  <img src={data.profilePictureUrl} alt="Profile" className="w-full h-full object-cover rounded-[24px]" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-rose-50 to-rose-100 rounded-[24px]">
+                    <User className="w-12 h-12 text-rose-300" />
+                  </div>
+                )}
+              </div>
+              {isEditing && (
+                <label className="absolute bottom-1 right-1 bg-rose-500 rounded-full p-2 cursor-pointer hover:bg-rose-600 transition-colors shadow-md">
+                  <Camera className="w-4 h-4 text-white" />
+                  <input type="file" accept="image/*" className="hidden" />
+                </label>
+              )}
+            </div>
+
+            {/* ── READ MODE ── */}
+            {!isEditing && (
+              <div className="flex-1 text-center md:text-left space-y-2">
+                {/* Name + Age */}
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {data.name || 'Your Name'}
+                  {data.age ? <span className="text-lg font-normal text-gray-400 ml-1">, {data.age}</span> : ''}
+                </h2>
+                {/* DOB + Gender pills on separate lines */}
+                <div className="flex items-center justify-center md:justify-start gap-2">
+                  {data.dob ? (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50/80 border border-rose-100 text-rose-600 text-[13px] font-medium">
+                      <Calendar className="w-3.5 h-3.5" />
+                      {format(new Date(data.dob), 'PPP')}
+                    </span>
+                  ) : (
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50/40 border border-rose-100/60 text-rose-300 text-[13px] font-medium cursor-default">
+                            <Calendar className="w-3.5 h-3.5" /> –
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Date of Birth is not set</p></TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </div>
+                <div className="flex items-center justify-center md:justify-start gap-2">
+                  {data.gender ? (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-50 border border-gray-200/80 text-gray-600 text-[13px] font-medium capitalize">
+                      <User className="w-3.5 h-3.5" />
+                      {data.gender}
+                    </span>
+                  ) : (
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-50/40 border border-gray-200/60 text-gray-300 text-[13px] font-medium cursor-default">
+                            <User className="w-3.5 h-3.5" /> –
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Gender is not set</p></TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </div>
+              </div>
             )}
+
+            {/* ── EDIT MODE HEADER ── */}
+            {isEditing && (
+              <div className="flex-1 text-center md:text-left">
+                <h2 className="text-2xl font-bold text-gray-900">Edit Profile</h2>
+                <p className="text-sm text-gray-400 mt-0.5">Update your personal details below</p>
+              </div>
+            )}
+
+            {/* Action buttons */}
+            <div className="flex gap-2 flex-shrink-0">
+              <Button variant="outline" onClick={() => setIsShareDialogOpen(true)}
+                      className="rounded-xl border-gray-200 text-gray-600 hover:border-rose-300 hover:text-rose-500 transition-colors">
+                <Share2 className="w-4 h-4 mr-2" /> Share
+              </Button>
+              {isEditing ? (
+                <>
+                  <Button variant="outline" onClick={handleCancel} className="rounded-xl border-gray-200">
+                    <X className="w-4 h-4 mr-2" /> Cancel
+                  </Button>
+                  <Button onClick={handleSave}
+                          className="rounded-xl bg-gradient-to-r from-rose-500 to-rose-400 hover:from-rose-600 hover:to-rose-500 text-white shadow-md">
+                    <Save className="w-4 h-4 mr-2" /> Save Changes
+                  </Button>
+                </>
+              ) : (
+                <Button onClick={handleEdit}
+                        className="rounded-xl bg-gradient-to-r from-rose-500 to-rose-400 hover:from-rose-600 hover:to-rose-500 text-white shadow-md">
+                  <Edit2 className="w-4 h-4 mr-2" /> Edit Profile
+                </Button>
+              )}
+            </div>
           </div>
+
+          {/* ── Editable identity fields: Name → DOB → Gender (stacked) ── */}
+          {isEditing && (
+            <div className="mt-6 pt-5 border-t border-gray-100">
+              <div className="space-y-4 max-w-xl">
+                {/* Full Name */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1">Full Name <span className="text-red-500">*</span></Label>
+                  <Input value={data.name} onChange={(e) => updateField('name', e.target.value)} placeholder="Enter your full name"
+                         className="h-11 rounded-xl border-gray-200 focus:border-rose-300 focus:ring-rose-200/50" />
+                </div>
+                {/* Date of Birth */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1">Date of Birth <span className="text-red-500">*</span></Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className={`w-full h-11 justify-start text-left font-normal rounded-xl border-gray-200 ${!data.dob ? 'text-muted-foreground' : ''}`}>
+                        <Calendar className="mr-2 h-4 w-4 text-rose-400" />
+                        {data.dob ? format(new Date(data.dob), 'PPP') : 'Select date of birth'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      {dobView === 'year' && (
+                        <div className="p-3">
+                          <p className="text-sm font-medium text-center mb-2">Select Year</p>
+                          <div className="grid grid-cols-4 gap-1.5 max-h-[240px] overflow-y-auto">
+                            {Array.from({ length: currentYear - 1945 + 1 }, (_, i) => 1945 + i).reverse().map((y) => (
+                              <button key={y} onClick={() => { setDobNavMonth(new Date(y, dobNavMonth.getMonth())); setDobView('month'); }}
+                                className={`px-2 py-1.5 text-sm rounded-md transition-colors ${dobNavMonth.getFullYear() === y ? 'bg-primary text-primary-foreground font-medium' : 'hover:bg-accent'}`}>{y}</button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {dobView === 'month' && (
+                        <div className="p-3">
+                          <button onClick={() => setDobView('year')} className="text-sm font-medium w-full text-center mb-2 hover:text-primary cursor-pointer">{dobNavMonth.getFullYear()} ▾</button>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((name, idx) => (
+                              <button key={name} onClick={() => { setDobNavMonth(new Date(dobNavMonth.getFullYear(), idx)); setDobView('day'); }}
+                                className={`px-2 py-1.5 text-sm rounded-md transition-colors ${dobNavMonth.getMonth() === idx ? 'bg-primary text-primary-foreground font-medium' : 'hover:bg-accent'}`}>{name}</button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {dobView === 'day' && (
+                        <CalendarComponent mode="single" month={dobNavMonth} onMonthChange={setDobNavMonth}
+                          selected={data.dob ? new Date(data.dob) : undefined}
+                          onSelect={(date) => { if (date) { const y=date.getFullYear(); const m=String(date.getMonth()+1).padStart(2,'0'); const d=String(date.getDate()).padStart(2,'0'); updateField('dob',`${y}-${m}-${d}`); const today=new Date(); let ca=today.getFullYear()-y; const md=today.getMonth()-date.getMonth(); if(md<0||(md===0&&today.getDate()<date.getDate()))ca--; updateField('age',ca.toString()); } }}
+                          disabled={(date) => date > new Date() || date < new Date('1920-01-01')} initialFocus className="rounded-md border"
+                          components={{ CaptionLabel: ({displayMonth}:{displayMonth:Date}) => (<button onClick={(e)=>{e.preventDefault();setDobView('year');}} className="text-sm font-medium cursor-pointer hover:text-primary hover:underline underline-offset-2 transition-colors flex items-center gap-1">{['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][displayMonth.getMonth()]} {displayMonth.getFullYear()} ▾</button>) }}
+                        />
+                      )}
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                {/* Gender */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1">Gender <span className="text-red-500">*</span></Label>
+                  <RadioGroup value={data.gender} onValueChange={(value) => updateField('gender', value)} className="flex gap-3 pt-1">
+                    {[
+                      { value: 'male', label: 'Male', id: 'hero-male' },
+                      { value: 'female', label: 'Female', id: 'hero-female' },
+                      { value: 'other', label: 'Other', id: 'hero-other' },
+                    ].map(({ value, label, id }) => (
+                      <label key={value} htmlFor={id}
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border cursor-pointer transition-all text-sm font-medium ${
+                          data.gender === value
+                            ? 'border-rose-300 bg-rose-50/70 text-rose-700 shadow-sm'
+                            : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                        }`}>
+                        <RadioGroupItem value={value} id={id} className="sr-only" />
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                          data.gender === value ? 'border-rose-500' : 'border-gray-300'
+                        }`}>
+                          {data.gender === value && <div className="w-2 h-2 rounded-full bg-rose-500" />}
+                        </div>
+                        {label}
+                      </label>
+                    ))}
+                  </RadioGroup>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Share Dialog */}
@@ -742,157 +1270,165 @@ export const ProfilePage = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Profile Picture & Basic Info Card */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row items-center gap-6">
-              <div className="relative">
-                <div className="w-24 h-24 rounded-full border-2 border-border flex items-center justify-center overflow-hidden bg-accent/30">
-                  {data.profilePictureUrl ? (
-                    <img src={data.profilePictureUrl} alt="Profile" className="w-full h-full object-cover" />
-                  ) : (
-                    <User className="w-10 h-10 text-muted-foreground" />
-                  )}
-                </div>
-                {isEditing && (
-                  <label className="absolute -bottom-1 -right-1 bg-primary rounded-full p-2 cursor-pointer hover:bg-primary/90 transition-colors">
-                    <Camera className="w-4 h-4 text-primary-foreground" />
-                    <input type="file" accept="image/*" className="hidden" />
-                  </label>
-                )}
-              </div>
-              <div className="flex-1 text-center md:text-left space-y-1">
-                <h2 className="text-2xl font-bold text-foreground">{data.name}</h2>
-                <p className="text-muted-foreground">{data.city}, {data.state}</p>
-                <div className="flex flex-wrap justify-center md:justify-start gap-3 text-sm text-muted-foreground mt-2">
-                  <span className="flex items-center gap-1">
-                    <Phone className="w-4 h-4" /> {data.phone}
-                  </span>
-                  {data.email && (
-                    <span className="flex items-center gap-1">
-                      <Mail className="w-4 h-4" /> {data.email}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Tabs for different sections */}
+        {/* ── Content area ── */}
+        <div className="px-4 md:px-8 pb-8 space-y-6">
         <Tabs defaultValue="personal" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="personal">Personal</TabsTrigger>
-            <TabsTrigger value="housing">Housing</TabsTrigger>
-            <TabsTrigger value="habits">Habits</TabsTrigger>
-            <TabsTrigger value="saved" className="flex items-center gap-1">
-              <Bookmark className="w-4 h-4" />
-              Saved
+          <TabsList className="inline-flex w-full p-1.5 rounded-2xl border border-white/60 shadow-sm" style={{ background: 'rgba(255,255,255,0.65)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}>
+            <TabsTrigger value="personal" className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold text-gray-500 transition-all duration-200 data-[state=active]:bg-gradient-to-r data-[state=active]:from-rose-500 data-[state=active]:to-pink-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-rose-200/50 hover:text-rose-500">
+              <User className="w-4 h-4" /> Personal
+            </TabsTrigger>
+            <TabsTrigger value="housing" className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold text-gray-500 transition-all duration-200 data-[state=active]:bg-gradient-to-r data-[state=active]:from-rose-500 data-[state=active]:to-pink-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-rose-200/50 hover:text-rose-500">
+              <Home className="w-4 h-4" /> Housing
+            </TabsTrigger>
+            <TabsTrigger value="habits" className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold text-gray-500 transition-all duration-200 data-[state=active]:bg-gradient-to-r data-[state=active]:from-rose-500 data-[state=active]:to-pink-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-rose-200/50 hover:text-rose-500">
+              <Heart className="w-4 h-4" /> Habits
+            </TabsTrigger>
+            <TabsTrigger value="saved" className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold text-gray-500 transition-all duration-200 data-[state=active]:bg-gradient-to-r data-[state=active]:from-rose-500 data-[state=active]:to-pink-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-rose-200/50 hover:text-rose-500">
+              <Bookmark className="w-4 h-4" /> Saved
             </TabsTrigger>
           </TabsList>
 
           {/* Personal Info Tab */}
           <TabsContent value="personal" className="space-y-4 mt-4">
-            <Card>
+            <Card className="rounded-2xl border-gray-200/60 shadow-[0_2px_12px_hsl(220_13%_91%/0.4)]">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="w-5 h-5" />
-                  Basic Information
+                <CardTitle className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center">
+                    <ShieldCheck className="w-4 h-4 text-rose-500" />
+                  </div>
+                  <span className="text-[16px] font-bold text-gray-800">Contact & Verification</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Full Name</Label>
+              <CardContent className="space-y-5">
+                {/* Phone */}
+                <div className="flex items-start gap-4 p-4 rounded-xl bg-gray-50/70 border border-gray-100">
+                  <div className="w-10 h-10 rounded-lg bg-white border border-gray-200/70 flex items-center justify-center flex-shrink-0 shadow-sm">
+                    <Phone className="w-5 h-5 text-gray-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <Label className="text-[11px] uppercase tracking-wider text-gray-400 font-bold">Phone Number <span className="text-red-500">*</span></Label>
                     {isEditing ? (
-                      <Input
-                        value={data.name}
-                        onChange={(e) => updateField('name', e.target.value)}
-                      />
+                      <div className="flex gap-2 mt-1">
+                        <Select value="+91">
+                          <SelectTrigger className="w-[100px] shrink-0">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-background border max-h-60">
+                            {[
+                              { code: "+1", flag: "🇺🇸" }, { code: "+33", flag: "🇫🇷" },
+                              { code: "+44", flag: "🇬🇧" }, { code: "+49", flag: "🇩🇪" },
+                              { code: "+61", flag: "🇦🇺" }, { code: "+65", flag: "🇸🇬" },
+                              { code: "+81", flag: "🇯🇵" }, { code: "+82", flag: "🇰🇷" },
+                              { code: "+86", flag: "🇨🇳" }, { code: "+91", flag: "🇮🇳" },
+                              { code: "+92", flag: "🇵🇰" }, { code: "+94", flag: "🇱🇰" },
+                              { code: "+880", flag: "🇧🇩" }, { code: "+966", flag: "🇸🇦" },
+                              { code: "+971", flag: "🇦🇪" }, { code: "+977", flag: "🇳🇵" },
+                            ].map(({ code, flag }) => (
+                              <SelectItem key={code} value={code}>{flag} {code}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          type="tel"
+                          placeholder="Enter 10-digit number"
+                          value={data.phone}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                            updateField('phone', value);
+                            // Auto-unverify if phone changed from original verified value
+                            if (data.phoneVerified && value !== originalVerifiedPhone) {
+                              updateField('phoneVerified', false as any);
+                            }
+                          }}
+                          maxLength={10}
+                          className="flex-1"
+                        />
+                      </div>
+                    ) : data.phone ? (
+                      <p className="text-[15px] font-semibold text-gray-900 mt-0.5">{data.phone}</p>
                     ) : (
-                      <p className="text-foreground p-2 bg-muted/30 rounded-md">{data.name}</p>
+                      <TooltipProvider delayDuration={200}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <p className="text-[15px] font-semibold text-gray-300 mt-0.5 cursor-default">–</p>
+                          </TooltipTrigger>
+                          <TooltipContent><p>Phone Number is not set</p></TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     )}
                   </div>
-                  <div className="space-y-2">
-                    <Label>Age</Label>
-                    {isEditing ? (
-                      <Input
-                        type="number"
-                        value={data.age}
-                        onChange={(e) => updateField('age', e.target.value)}
-                      />
+                  <div className="flex-shrink-0 pt-4">
+                    {isPhoneVerified ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200/60 text-emerald-700 text-xs font-semibold">
+                        <ShieldCheck className="w-3.5 h-3.5" /> Verified
+                      </span>
                     ) : (
-                      <p className="text-foreground p-2 bg-muted/30 rounded-md">{data.age} years</p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Gender</Label>
-                    {isEditing ? (
-                      <RadioGroup
-                        value={data.gender}
-                        onValueChange={(value) => updateField('gender', value)}
-                        className="flex gap-4"
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleVerifyPhone}
+                        disabled={!data.phone || data.phone.length !== 10 || verifyLoading === "phone"}
+                        className="rounded-full border-rose-200 text-rose-500 hover:bg-rose-50 hover:border-rose-300 text-xs font-semibold px-4"
                       >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="male" id="edit-male" />
-                          <Label htmlFor="edit-male">Male</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="female" id="edit-female" />
-                          <Label htmlFor="edit-female">Female</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="other" id="edit-other" />
-                          <Label htmlFor="edit-other">Other</Label>
-                        </div>
-                      </RadioGroup>
-                    ) : (
-                      <p className="text-foreground p-2 bg-muted/30 rounded-md capitalize">{data.gender}</p>
+                        {verifyLoading === "phone" ? (
+                          <span className="flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending...</span>
+                        ) : "Verify"}
+                      </Button>
                     )}
                   </div>
-                  <div className="space-y-2">
-                    <Label>Phone</Label>
-                    {isEditing ? (
-                      <Input
-                        value={data.phone}
-                        onChange={(e) => updateField('phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
-                      />
-                    ) : (
-                      <p className="text-foreground p-2 bg-muted/30 rounded-md">{data.phone}</p>
-                    )}
+                </div>
+
+                {/* Email */}
+                <div className="flex items-start gap-4 p-4 rounded-xl bg-gray-50/70 border border-gray-100">
+                  <div className="w-10 h-10 rounded-lg bg-white border border-gray-200/70 flex items-center justify-center flex-shrink-0 shadow-sm">
+                    <Mail className="w-5 h-5 text-gray-500" />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Email</Label>
+                  <div className="flex-1 min-w-0">
+                    <Label className="text-[11px] uppercase tracking-wider text-gray-400 font-bold">Email Address</Label>
                     {isEditing ? (
                       <Input
                         type="email"
                         value={data.email}
-                        onChange={(e) => updateField('email', e.target.value)}
+                        onChange={(e) => {
+                          updateField('email', e.target.value);
+                          // Auto-unverify if email changed from original verified value
+                          if (data.emailVerified && e.target.value !== originalVerifiedEmail) {
+                            updateField('emailVerified', false as any);
+                          }
+                        }}
+                        placeholder="Enter your email"
+                        className="mt-1"
                       />
+                    ) : data.email ? (
+                      <p className="text-[15px] font-semibold text-gray-900 mt-0.5">{data.email}</p>
                     ) : (
-                      <p className="text-foreground p-2 bg-muted/30 rounded-md">{data.email || 'Not provided'}</p>
+                      <TooltipProvider delayDuration={200}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <p className="text-[15px] font-semibold text-gray-300 mt-0.5 cursor-default">–</p>
+                          </TooltipTrigger>
+                          <TooltipContent><p>Email Address is not set</p></TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     )}
                   </div>
-                  <div className="space-y-2">
-                    <Label>City</Label>
-                    {isEditing ? (
-                      <Input
-                        value={data.city}
-                        onChange={(e) => updateField('city', e.target.value)}
-                      />
+                  <div className="flex-shrink-0 pt-4">
+                    {isEmailVerified ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200/60 text-emerald-700 text-xs font-semibold">
+                        <ShieldCheck className="w-3.5 h-3.5" /> Verified
+                      </span>
                     ) : (
-                      <p className="text-foreground p-2 bg-muted/30 rounded-md">{data.city}</p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label>State</Label>
-                    {isEditing ? (
-                      <Input
-                        value={data.state}
-                        onChange={(e) => updateField('state', e.target.value)}
-                      />
-                    ) : (
-                      <p className="text-foreground p-2 bg-muted/30 rounded-md">{data.state}</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleVerifyEmail}
+                        disabled={!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email) || verifyLoading === "email"}
+                        className="rounded-full border-rose-200 text-rose-500 hover:bg-rose-50 hover:border-rose-300 text-xs font-semibold px-4"
+                      >
+                        {verifyLoading === "email" ? (
+                          <span className="flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending...</span>
+                        ) : "Verify"}
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -900,15 +1436,17 @@ export const ProfilePage = () => {
             </Card>
 
             {/* Work Experience */}
-            <Card>
+            <Card className="rounded-2xl border-gray-200/60 shadow-[0_2px_12px_hsl(220_13%_91%/0.4)]">
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                  <span className="flex items-center gap-2">
-                    <Briefcase className="w-5 h-5" />
-                    Work Experience
+                  <span className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center">
+                      <Briefcase className="w-4 h-4 text-rose-500" />
+                    </div>
+                    <span className="text-[16px] font-bold text-gray-800">Work Experience</span>
                   </span>
                   {isEditing && (
-                    <Button variant="outline" size="sm" onClick={addJobExperience}>
+                    <Button variant="outline" size="sm" onClick={addJobExperience} className="rounded-xl border-gray-200 hover:border-rose-200 hover:text-rose-500">
                       <Plus className="w-4 h-4 mr-1" /> Add
                     </Button>
                   )}
@@ -919,19 +1457,19 @@ export const ProfilePage = () => {
                   <p className="text-muted-foreground text-center py-4">No work experience added</p>
                 ) : (
                   data.jobExperiences.map((exp, index) => (
-                    <div key={exp.id} className="border rounded-lg p-4 space-y-3 bg-accent/20">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-medium">Experience #{index + 1}</h4>
-                        {isEditing && (
+                    <div key={exp.id} className="border-l-2 border-l-rose-300 border border-gray-100 rounded-xl p-4 space-y-3 bg-white hover:shadow-sm transition-shadow">
+                      {isEditing && (
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-medium text-gray-700">Experience #{index + 1}</h4>
                           <Button variant="ghost" size="sm" onClick={() => removeJobExperience(exp.id)}>
                             <Trash2 className="w-4 h-4 text-destructive" />
                           </Button>
-                        )}
-                      </div>
+                        </div>
+                      )}
                       {isEditing ? (
                         <div className="grid grid-cols-2 gap-3">
                           <BrandMultiSelect
-                            label=""
+                            label={<>Company <span className="text-red-500">*</span></>}
                             placeholder="Select Company..."
                             options={companiesDb}
                             selectedValues={exp.company ? [exp.company] : []}
@@ -946,40 +1484,49 @@ export const ProfilePage = () => {
                               updateJobExperience(exp.id, 'company', newBrand.id);
                             }}
                           />
-                          <SearchableSelect
-                            value={positionOptions.includes(exp.position) && exp.position !== "Other" ? exp.position : ""}
-                            onValueChange={(val) => {
-                              if (val !== "Other") {
-                                updateJobExperience(exp.id, 'position', val);
-                              } else {
-                                setActiveJobIdForPosition(exp.id);
-                                setShowAddPositionDialog(true);
-                              }
-                            }}
-                            options={positionOptions}
-                            placeholder="Select position"
-                            searchPlaceholder="Search positions..."
-                            emptyText="No position found."
-                            alwaysShowOther={true}
-                          />
-                          <Select value={exp.fromYear} onValueChange={(v) => updateJobExperience(exp.id, 'fromYear', v)}>
-                            <SelectTrigger><SelectValue placeholder="From Year" /></SelectTrigger>
-                            <SelectContent className="bg-background border max-h-60">
-                              {years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                          {exp.currentlyWorking ? (
-                            <div className="h-10 px-3 py-2 bg-muted border rounded-md flex items-center text-muted-foreground">
-                              Currently Working
-                            </div>
-                          ) : (
-                            <Select value={exp.tillYear} onValueChange={(v) => updateJobExperience(exp.id, 'tillYear', v)}>
-                              <SelectTrigger><SelectValue placeholder="Till Year" /></SelectTrigger>
+                          <div className="space-y-1">
+                            <Label className="text-xs font-medium flex items-center gap-1">Position <span className="text-red-500">*</span></Label>
+                            <SearchableSelect
+                              value={positionOptions.includes(exp.position) && exp.position !== "Other" ? exp.position : ""}
+                              onValueChange={(val) => {
+                                if (val !== "Other") {
+                                  updateJobExperience(exp.id, 'position', val);
+                                } else {
+                                  setActiveJobIdForPosition(exp.id);
+                                  setShowAddPositionDialog(true);
+                                }
+                              }}
+                              options={positionOptions}
+                              placeholder="Select position"
+                              searchPlaceholder="Search positions..."
+                              emptyText="No position found."
+                              alwaysShowOther={true}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs font-medium flex items-center gap-1">From Year <span className="text-red-500">*</span></Label>
+                            <Select value={exp.fromYear} onValueChange={(v) => updateJobExperience(exp.id, 'fromYear', v)}>
+                              <SelectTrigger><SelectValue placeholder="Select year" /></SelectTrigger>
                               <SelectContent className="bg-background border max-h-60">
-                                {futureYears.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                                {years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
                               </SelectContent>
                             </Select>
-                          )}
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs font-medium flex items-center gap-1">Till Year {!exp.currentlyWorking && <span className="text-red-500">*</span>}</Label>
+                            {exp.currentlyWorking ? (
+                              <div className="h-10 px-3 py-2 bg-muted border rounded-md flex items-center text-muted-foreground">
+                                Currently Working
+                              </div>
+                            ) : (
+                              <Select value={exp.tillYear} onValueChange={(v) => updateJobExperience(exp.id, 'tillYear', v)}>
+                                <SelectTrigger><SelectValue placeholder="Select year" /></SelectTrigger>
+                                <SelectContent className="bg-background border max-h-60">
+                                  {futureYears.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            )}
+                          </div>
                           <div className="flex items-center space-x-2 col-span-full">
                             <Checkbox
                               checked={exp.currentlyWorking}
@@ -989,11 +1536,15 @@ export const ProfilePage = () => {
                           </div>
                         </div>
                       ) : (
-                        <div>
-                          <p className="font-medium">{exp.position} at {exp.company}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {exp.fromYear} - {exp.currentlyWorking ? 'Present' : exp.tillYear}
-                          </p>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-200/70 flex items-center justify-center flex-shrink-0">
+                            <Briefcase className="w-5 h-5 text-gray-400" />
+                          </div>
+                          <div>
+                            <p className="text-[14px] font-bold text-gray-900">{exp.position}</p>
+                            <p className="text-[12px] text-gray-500">{exp.company}{exp.currentlyWorking ? ' · Full-time' : ''}</p>
+                            <p className="text-[11px] text-gray-400">{exp.fromYear} – {exp.currentlyWorking ? 'Present' : exp.tillYear}</p>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1003,15 +1554,17 @@ export const ProfilePage = () => {
             </Card>
 
             {/* Education */}
-            <Card>
+            <Card className="rounded-2xl border-gray-200/60 shadow-[0_2px_12px_hsl(220_13%_91%/0.4)]">
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                  <span className="flex items-center gap-2">
-                    <BookOpen className="w-5 h-5" />
-                    Education
+                  <span className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center">
+                      <BookOpen className="w-4 h-4 text-rose-500" />
+                    </div>
+                    <span className="text-[16px] font-bold text-gray-800">Education</span>
                   </span>
                   {isEditing && (
-                    <Button variant="outline" size="sm" onClick={addEducation}>
+                    <Button variant="outline" size="sm" onClick={addEducation} className="rounded-xl border-gray-200 hover:border-rose-200 hover:text-rose-500">
                       <Plus className="w-4 h-4 mr-1" /> Add
                     </Button>
                   )}
@@ -1022,20 +1575,20 @@ export const ProfilePage = () => {
                   <p className="text-muted-foreground text-center py-4">No education added</p>
                 ) : (
                   data.educationExperiences.map((edu, index) => (
-                    <div key={edu.id} className="border rounded-lg p-4 space-y-3 bg-accent/20">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-medium">Education #{index + 1}</h4>
-                        {isEditing && (
+                    <div key={edu.id} className="border-l-2 border-l-rose-300 border border-gray-100 rounded-xl p-4 space-y-3 bg-white hover:shadow-sm transition-shadow">
+                      {isEditing && (
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-medium text-gray-700">Education #{index + 1}</h4>
                           <Button variant="ghost" size="sm" onClick={() => removeEducation(edu.id)}>
                             <Trash2 className="w-4 h-4 text-destructive" />
                           </Button>
-                        )}
-                      </div>
+                        </div>
+                      )}
                       {isEditing ? (
                         <>
                           <div className="grid grid-cols-2 gap-3">
                             <BrandMultiSelect
-                              label=""
+                              label={<>Institution <span className="text-red-500">*</span></>}
                               placeholder="Select Institution..."
                               options={schoolsDb}
                               selectedValues={edu.institution ? [edu.institution] : []}
@@ -1050,45 +1603,58 @@ export const ProfilePage = () => {
                                 updateEducation(edu.id, 'institution', newBrand.id);
                               }}
                             />
-                            < SearchableSelect
-                              value={degreeOptions.includes(edu.degree) && edu.degree !== "Other" ? edu.degree : ""}
-                              onValueChange={(val) => {
-                                if (val !== "Other") {
-                                  updateEducation(edu.id, 'degree', val);
-                                } else {
-                                  setActiveEducationId(edu.id);
-                                  setShowAddDegreeDialog(true);
-                                }
-                              }}
-                              options={degreeOptions}
-                              placeholder="Select degree"
-                              searchPlaceholder="Search degrees..."
-                              emptyText="No degree found."
-                              alwaysShowOther={true}
-                            />
+                            <div className="space-y-1">
+                              <Label className="text-xs font-medium flex items-center gap-1">Degree <span className="text-red-500">*</span></Label>
+                              <SearchableSelect
+                                value={degreeOptions.includes(edu.degree) && edu.degree !== "Other" ? edu.degree : ""}
+                                onValueChange={(val) => {
+                                  if (val !== "Other") {
+                                    updateEducation(edu.id, 'degree', val);
+                                  } else {
+                                    setActiveEducationId(edu.id);
+                                    setShowAddDegreeDialog(true);
+                                  }
+                                }}
+                                options={degreeOptions}
+                                placeholder="Select degree"
+                                searchPlaceholder="Search degrees..."
+                                emptyText="No degree found."
+                                alwaysShowOther={true}
+                              />
+                            </div>
                           </div >
 
                           <div className="grid grid-cols-2 gap-3 mt-3">
-                            <Select value={edu.startYear} onValueChange={(v) => updateEducation(edu.id, 'startYear', v)}>
-                              <SelectTrigger><SelectValue placeholder="Start Year" /></SelectTrigger>
-                              <SelectContent className="bg-background border max-h-60">
-                                {years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                            <Select value={edu.endYear} onValueChange={(v) => updateEducation(edu.id, 'endYear', v)}>
-                              <SelectTrigger><SelectValue placeholder="End Year" /></SelectTrigger>
-                              <SelectContent className="bg-background border max-h-60">
-                                {futureYears.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
+                            <div className="space-y-1">
+                              <Label className="text-xs font-medium flex items-center gap-1">Start Year <span className="text-red-500">*</span></Label>
+                              <Select value={edu.startYear} onValueChange={(v) => updateEducation(edu.id, 'startYear', v)}>
+                                <SelectTrigger><SelectValue placeholder="Select year" /></SelectTrigger>
+                                <SelectContent className="bg-background border max-h-60">
+                                  {years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs font-medium flex items-center gap-1">End Year <span className="text-red-500">*</span></Label>
+                              <Select value={edu.endYear} onValueChange={(v) => updateEducation(edu.id, 'endYear', v)}>
+                                <SelectTrigger><SelectValue placeholder="Select year" /></SelectTrigger>
+                                <SelectContent className="bg-background border max-h-60">
+                                  {futureYears.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
                           </div>
                         </>
                       ) : (
-                        <div>
-                          <p className="font-medium">{edu.degree}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {edu.institution} • {edu.startYear} - {edu.endYear}
-                          </p>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-200/70 flex items-center justify-center flex-shrink-0">
+                            <BookOpen className="w-5 h-5 text-gray-400" />
+                          </div>
+                          <div>
+                            <p className="text-[14px] font-bold text-gray-900">{edu.institution || edu.degree}</p>
+                            {edu.institution && <p className="text-[12px] text-gray-500">{edu.degree}</p>}
+                            <p className="text-[11px] text-gray-400">{edu.startYear} – {edu.endYear}</p>
+                          </div>
                         </div>
                       )}
                     </div >
@@ -1101,11 +1667,13 @@ export const ProfilePage = () => {
           {/* Housing Tab */}
           < TabsContent value="housing" className="space-y-4 mt-4" >
             {/* Search Type Card */}
-            < Card >
+            <Card className="rounded-2xl border-gray-200/60 shadow-[0_2px_12px_hsl(220_13%_91%/0.4)]">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Home className="w-5 h-5" />
-                  What are you looking for?
+                <CardTitle className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center">
+                    <Home className="w-4 h-4 text-rose-500" />
+                  </div>
+                  <span className="text-[16px] font-bold text-gray-800">What are you looking for?</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -1138,22 +1706,27 @@ export const ProfilePage = () => {
                     </div>
                   </RadioGroup>
                 ) : (
-                  <p className="text-foreground p-2 bg-muted/30 rounded-md">
+                  <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200/50">
+                    <Home className="w-4 h-4 text-rose-500" />
+                    <span className="text-[14px] font-semibold text-rose-700">
                     {data.searchType === 'flat' ? 'Looking for a flat' :
                       data.searchType === 'flatmate' ? 'Looking for flatmates' :
                         'Open to both'}
-                  </p>
+                    </span>
+                  </div>
                 )}
               </CardContent>
             </Card >
 
             {/* Looking for Flat — shown for flat seekers, same as signup */}
             {(data.searchType === "flat" || data.searchType === "both") && (
-              <Card>
+              <Card className="rounded-2xl border-gray-200/60 shadow-[0_2px_12px_hsl(220_13%_91%/0.4)]">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Home className="w-5 h-5" />
-                    Looking for Flat
+                  <CardTitle className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center">
+                      <Home className="w-4 h-4 text-rose-500" />
+                    </div>
+                    <span className="text-[16px] font-bold text-gray-800">Looking for Flat</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -1170,7 +1743,7 @@ export const ProfilePage = () => {
                         onChange={(e) => updateField('propertyMoveInDate', e.target.value)}
                       />
                     ) : (
-                      <p className="text-foreground p-2 bg-muted/30 rounded-md">
+                      <p className="text-[15px] font-semibold text-gray-900">
                         {data.propertyMoveInDate ? new Date(data.propertyMoveInDate).toLocaleDateString() : 'Not set'}
                       </p>
                     )}
@@ -1205,7 +1778,7 @@ export const ProfilePage = () => {
                       />
                     ) : (
                       <div className="space-y-2">
-                         <p className="text-foreground p-2 bg-muted/30 rounded-md">
+                         <p className="text-[15px] font-semibold text-gray-900">
                           {data.searchLocation || 'No location selected'} (Radius: {data.searchRadius}km)
                         </p>
                         {data.searchCoordinates && (
@@ -1230,11 +1803,13 @@ export const ProfilePage = () => {
             {/* Flat Details — shown for flatmate seekers, same as signup */}
             {
               (data.searchType === 'flatmate' || data.searchType === 'both') && (
-                <Card>
+                <Card className="rounded-2xl border-gray-200/60 shadow-[0_2px_12px_hsl(220_13%_91%/0.4)]">
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Home className="w-5 h-5" />
-                      Your Flat Details
+                    <CardTitle className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center">
+                        <Home className="w-4 h-4 text-rose-500" />
+                      </div>
+                      <span className="text-[16px] font-bold text-gray-800">Your Flat Details</span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-6">
@@ -1286,7 +1861,7 @@ export const ProfilePage = () => {
                         </div>
                       ) : (
                         <div className="space-y-2">
-                          <p className="text-foreground p-2 bg-muted/30 rounded-md">
+                          <p className="text-[15px] font-semibold text-gray-900">
                             {data.flatDetails.address || 'Not provided'}
                             {(data.flatDetails.city || data.flatDetails.state) && ` (${[data.flatDetails.city, data.flatDetails.state].filter(Boolean).join(', ')})`}
                           </p>
@@ -1325,7 +1900,7 @@ export const ProfilePage = () => {
                             </SelectContent>
                           </Select>
                         ) : (
-                          <p className="text-foreground p-2 bg-muted/30 rounded-md">
+                          <p className="text-[15px] font-semibold text-gray-900">
                             {data.flatDetails.flatType ? { '1rk': '1 RK', '1bhk': '1 BHK', '2bhk': '2 BHK', '3bhk': '3 BHK', '4bhk': '4 BHK', '4+bhk': '4+ BHK' }[data.flatDetails.flatType] : 'Not provided'}
                           </p>
                         )}
@@ -1346,7 +1921,7 @@ export const ProfilePage = () => {
                             </SelectContent>
                           </Select>
                         ) : (
-                          <p className="text-foreground p-2 bg-muted/30 rounded-md">
+                          <p className="text-[15px] font-semibold text-gray-900">
                             {data.flatDetails.flatFurnishing ? { 'non-furnished': 'Non Furnished', 'semi-furnished': 'Semi-Furnished', 'fully-furnished': 'Fully Furnished' }[data.flatDetails.flatFurnishing] : 'Not provided'}
                           </p>
                         )}
@@ -1626,7 +2201,7 @@ export const ProfilePage = () => {
                           <p className="text-xs text-muted-foreground text-right mt-1">{(data.flatDetails.description || '').length}/800</p>
                         </div>
                       ) : (
-                        <p className="text-foreground p-2 bg-muted/30 rounded-md">{data.flatDetails.description || 'No description'}</p>
+                        <p className="text-[15px] font-semibold text-gray-900">{data.flatDetails.description || 'No description'}</p>
                       )}
                     </div>
 
@@ -1682,11 +2257,13 @@ export const ProfilePage = () => {
 
           {/* Habits Tab */}
           < TabsContent value="habits" className="space-y-4 mt-4" >
-            <Card>
+            <Card className="rounded-2xl border-gray-200/60 shadow-[0_2px_12px_hsl(220_13%_91%/0.4)]">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Heart className="w-5 h-5" />
-                  My Habits
+                <CardTitle className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center">
+                    <Heart className="w-4 h-4 text-rose-500" />
+                  </div>
+                  <span className="text-[16px] font-bold text-gray-800">My Habits</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1746,11 +2323,13 @@ export const ProfilePage = () => {
 
           {/* Saved Profiles Tab */}
           < TabsContent value="saved" className="space-y-4 mt-4" >
-            <Card>
+            <Card className="rounded-2xl border-gray-200/60 shadow-[0_2px_12px_hsl(220_13%_91%/0.4)]">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Bookmark className="w-5 h-5" />
-                  Saved Profiles ({savedProfiles.length})
+                <CardTitle className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center">
+                    <Bookmark className="w-4 h-4 text-rose-500" />
+                  </div>
+                  <span className="text-[16px] font-bold text-gray-800">Saved Profiles ({savedProfiles.length})</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -1774,41 +2353,41 @@ export const ProfilePage = () => {
                     {savedProfiles.map((savedProfile: any) => (
                       <div
                         key={savedProfile.id}
-                        className="flex flex-col gap-4 border border-border/50 rounded-xl p-4 hover:shadow-md transition-all bg-card/50 cursor-pointer"
+                        className="group flex items-center gap-4 p-4 rounded-xl border border-gray-100 bg-white hover:border-rose-200/60 hover:shadow-md transition-all cursor-pointer"
                         onClick={() => {
                           setSearchParams({ profile: savedProfile.id, from: 'saved' });
                         }}
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="w-14 h-14 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 ring-1 ring-gray-200">
                           <img
                             src={savedProfile.profile_picture_url || "/placeholder.svg"}
                             alt={savedProfile.name}
-                            className="w-14 h-14 rounded-full object-cover border-2 border-primary/20"
+                            className="w-full h-full object-cover"
                           />
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-foreground">{savedProfile.name}</h4>
-                            <p className="text-sm text-muted-foreground">
-                              {savedProfile.age} years • {savedProfile.city}, {savedProfile.state}
-                            </p>
-                            <Badge
-                              variant={savedProfile.search_type === "flatmate" ? "default" : "secondary"}
-                              className="text-xs mt-1"
-                            >
-                              {savedProfile.search_type === "flatmate" ? "Has Flat" : "Looking for Flat"}
-                            </Badge>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleUnsaveProfile(savedProfile.id);
-                            }}
-                            className="text-muted-foreground hover:text-destructive"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
                         </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[14px] font-bold text-gray-900 truncate">{savedProfile.name}, {savedProfile.age}</p>
+                          <p className="text-[12px] text-gray-500 truncate flex items-center gap-1">
+                            <MapPin className="w-3 h-3" /> {savedProfile.city}, {savedProfile.state}
+                          </p>
+                          <Badge
+                            variant={savedProfile.search_type === "flatmate" ? "default" : "secondary"}
+                            className="text-xs mt-1"
+                          >
+                            {savedProfile.search_type === "flatmate" ? "Has Flat" : "Looking for Flat"}
+                          </Badge>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleUnsaveProfile(savedProfile.id);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-rose-500"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                         <div className="flex flex-wrap gap-1">
                           {savedProfile.user_habits && Array.isArray(savedProfile.user_habits) && (
                             <>
@@ -1833,8 +2412,8 @@ export const ProfilePage = () => {
             </Card>
           </TabsContent>
         </Tabs>
-      </div>
-
+        </div> {/* Close px-4 content wrapper */}
+      </div> {/* Close max-w-4xl */}
       {/* Add Custom Degree Dialog */}
       <Dialog open={showAddDegreeDialog} onOpenChange={setShowAddDegreeDialog}>
         <DialogContent className="sm:max-w-[425px]">
@@ -1965,6 +2544,117 @@ export const ProfilePage = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ── OTP Verification Dialog (same as signup form) ── */}
+      <Dialog open={otpDialogOpen} onOpenChange={(open) => { if (!otpVerifying) setOtpDialogOpen(open); }}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md mx-auto p-4 sm:p-6">
+          <DialogHeader className="text-center space-y-2 sm:space-y-3">
+            <div className="flex justify-center">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, hsl(346 77% 49%), hsl(346 77% 65%))' }}>
+                <ShieldCheck className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+              </div>
+            </div>
+            <DialogTitle className="text-lg sm:text-xl font-bold text-center">
+              Verify {otpType === "phone" ? "Phone Number" : "Email Address"}
+            </DialogTitle>
+            <DialogDescription className="text-sm sm:text-base text-muted-foreground text-center">
+              Enter the 6-digit code sent to{" "}
+              <span className="font-semibold text-foreground break-all">
+                {otpType === "phone" ? `${countryCode} ${data.phone}` : data.email}
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col items-center gap-4 sm:gap-6 py-3 sm:py-4">
+            <InputOTP
+              maxLength={6}
+              value={otpValue}
+              onChange={(value) => { setOtpValue(value); setOtpError(""); }}
+            >
+              <InputOTPGroup className="gap-1.5 sm:gap-2">
+                <InputOTPSlot index={0} className="w-10 h-10 sm:w-12 sm:h-12 text-base sm:text-lg font-semibold rounded-md" />
+                <InputOTPSlot index={1} className="w-10 h-10 sm:w-12 sm:h-12 text-base sm:text-lg font-semibold rounded-md" />
+                <InputOTPSlot index={2} className="w-10 h-10 sm:w-12 sm:h-12 text-base sm:text-lg font-semibold rounded-md" />
+                <InputOTPSlot index={3} className="w-10 h-10 sm:w-12 sm:h-12 text-base sm:text-lg font-semibold rounded-md" />
+                <InputOTPSlot index={4} className="w-10 h-10 sm:w-12 sm:h-12 text-base sm:text-lg font-semibold rounded-md" />
+                <InputOTPSlot index={5} className="w-10 h-10 sm:w-12 sm:h-12 text-base sm:text-lg font-semibold rounded-md" />
+              </InputOTPGroup>
+            </InputOTP>
+
+            {otpError && (
+              <p className="text-xs sm:text-sm text-red-500 text-center px-2">{otpError}</p>
+            )}
+
+            <Button
+              onClick={handleOtpVerify}
+              disabled={otpValue.length !== 6 || otpVerifying}
+              className="w-full h-10 sm:h-11 text-sm sm:text-base rounded-xl bg-gradient-to-r from-rose-500 to-rose-400 hover:from-rose-600 hover:to-rose-500 text-white"
+            >
+              {otpVerifying ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Verifying...
+                </span>
+              ) : (
+                "Verify OTP"
+              )}
+            </Button>
+
+            <div className="text-center text-xs sm:text-sm text-muted-foreground">
+              {otpCountdown > 0 ? (
+                <p>Resend code in{" "}<span className="font-semibold text-foreground">{otpCountdown}s</span></p>
+              ) : (
+                <button onClick={handleResendOtp} className="text-rose-500 font-semibold hover:underline transition-colors" type="button">
+                  Resend OTP
+                </button>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
+
+/* ─── Profile Geometric Background Styles ─── */
+const profileGeoStyles = `
+  @keyframes profile-float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-14px); }
+  }
+  @keyframes profile-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  @keyframes profile-drift {
+    0%, 100% { transform: translate(0, 0); }
+    25% { transform: translate(12px, -8px); }
+    50% { transform: translate(-4px, -16px); }
+    75% { transform: translate(-12px, -6px); }
+  }
+  @keyframes profile-pulse-ring {
+    0% { transform: scale(0.85); opacity: 0.4; }
+    50% { transform: scale(1.1); opacity: 0.15; }
+    100% { transform: scale(0.85); opacity: 0.4; }
+  }
+  @keyframes profile-pulse-glow {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.6; }
+  }
+  .profile-spin-slow {
+    animation: profile-spin 30s linear infinite;
+  }
+  .profile-pulse-ring {
+    animation: profile-pulse-ring 5s ease-in-out infinite;
+  }
+  .profile-drift {
+    animation: profile-drift 9s ease-in-out infinite;
+  }
+  .profile-float-anim {
+    animation: profile-float 5s ease-in-out infinite;
+  }
+  .profile-orb {
+    animation: profile-pulse-glow 7s ease-in-out infinite;
+    pointer-events: none;
+  }
+`;
