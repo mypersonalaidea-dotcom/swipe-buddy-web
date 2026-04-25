@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { habitCategories, getCategoryForHabit } from "@/constants/habits";
 import { ChevronLeft, ChevronRight, SlidersHorizontal, ChevronDown, Home, Users, Heart, Building2, Briefcase, GraduationCap, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ProfileCard } from "@/components/profile/ProfileCard";
+import { AdCard } from "@/components/ads/AdCard";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -28,6 +29,12 @@ import { AddressAutocomplete } from "@/components/map/AddressAutocomplete";
 import { GoogleMapRenderer } from "@/components/map/GoogleMapRenderer";
 import { DEFAULT_MAP_CENTER } from "@/lib/maps/config";
 import type { GeocodeResult, LngLat } from "@/lib/maps/types";
+
+// ---- Google Ads configuration ----
+// TODO: Replace these with your real AdSense publisher ID and ad slot ID
+const AD_CLIENT = "ca-pub-2938555455040927"; // Your AdSense publisher ID
+const AD_SLOT = "XXXXXXXXXX";                // Your AdSense ad slot ID
+const AD_INTERVAL = 5;                        // Show an ad card after every N profile cards
 
 // ---- Types for flat details ----
 interface MediaFile {
@@ -124,6 +131,27 @@ export const HomePage = () => {
       },
     };
   });
+
+  // ---- Build a mixed swipe stack: profiles interleaved with ad cards ----
+  type SwipeItem =
+    | { type: "profile"; data: (typeof profiles)[number] }
+    | { type: "ad"; key: string };
+
+  const swipeItems: SwipeItem[] = useMemo(() => {
+    const items: SwipeItem[] = [];
+    profiles.forEach((profile, idx) => {
+      items.push({ type: "profile", data: profile });
+      // Insert an ad card after every AD_INTERVAL profiles
+      if ((idx + 1) % AD_INTERVAL === 0) {
+        items.push({ type: "ad", key: `ad-after-${idx}` });
+      }
+    });
+    // Also add an ad card at the very end if the last item isn't already an ad
+    if (profiles.length > 0 && profiles.length % AD_INTERVAL !== 0) {
+      items.push({ type: "ad", key: "ad-end" });
+    }
+    return items;
+  }, [profiles]);
 
   const [userSearchType] = useState<"flat" | "flatmate" | "both">("both");
   const [hasFlatDetails, setHasFlatDetails] = useState(
@@ -339,9 +367,9 @@ export const HomePage = () => {
     setFlatDetailsExpanded(prev => !prev);
   };
 
-  // --- Navigation ---
+  // --- Navigation (uses swipeItems length instead of profiles) ---
   const handleNext = () => {
-    if (isAnimating || currentIndex >= profiles.length - 1) return;
+    if (isAnimating || currentIndex >= swipeItems.length - 1) return;
     setIsAnimating(true);
     setAnimationDirection("left");
     setTimeout(() => { setCurrentIndex(prev => prev + 1); setIsAnimating(false); setAnimationDirection(null); }, 300);
@@ -1120,12 +1148,19 @@ export const HomePage = () => {
               <Loader2 className="w-8 h-8 animate-spin" />
               <p className="text-sm">Finding matches...</p>
             </div>
-          ) : profiles[currentIndex] ? (
+          ) : swipeItems[currentIndex] ? (
             <div className={animationDirection === "left" ? "animate-swipe-out-left w-full" : animationDirection === "right" ? "animate-swipe-out-right w-full" : "animate-slide-in w-full"}>
-              <ProfileCard 
-                profile={profiles[currentIndex]} 
-                isSaved={profiles[currentIndex]?.isSaved} 
-              />
+              {swipeItems[currentIndex].type === "profile" ? (
+                <ProfileCard 
+                  profile={(swipeItems[currentIndex] as any).data} 
+                  isSaved={(swipeItems[currentIndex] as any).data?.isSaved} 
+                />
+              ) : (
+                <AdCard
+                  adClient={AD_CLIENT}
+                  adSlot={AD_SLOT}
+                />
+              )}
             </div>
           ) : (
             <div className="flex flex-col items-center gap-3 text-muted-foreground">
@@ -1135,13 +1170,13 @@ export const HomePage = () => {
         </div>
 
         <div className="flex-shrink-0 w-12 flex items-center justify-center">
-          <Button variant="outline" size="icon" className="h-12 w-12 rounded-full shadow-card" onClick={handleNext} disabled={currentIndex >= profiles.length - 1 || isAnimating}>
+          <Button variant="outline" size="icon" className="h-12 w-12 rounded-full shadow-card" onClick={handleNext} disabled={currentIndex >= swipeItems.length - 1 || isAnimating}>
             <ChevronRight className="h-6 w-6" />
           </Button>
         </div>
 
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-sm text-muted-foreground">
-          {currentIndex + 1} / {profiles.length}
+          {currentIndex + 1} / {swipeItems.length}
         </div>
       </div>
     </div>
