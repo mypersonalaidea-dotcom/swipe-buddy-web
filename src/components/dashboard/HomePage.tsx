@@ -33,7 +33,7 @@ import type { GeocodeResult, LngLat } from "@/lib/maps/types";
 // ---- Google Ads configuration ----
 // TODO: Replace these with your real AdSense publisher ID and ad slot ID
 const AD_CLIENT = "ca-pub-2938555455040927"; // Your AdSense publisher ID
-const AD_SLOT = "XXXXXXXXXX";                // Your AdSense ad slot ID
+const AD_SLOT = "6643881699";                // Your AdSense ad slot ID
 const AD_INTERVAL = 5;                        // Show an ad card after every N profile cards
 
 // ---- Types for flat details ----
