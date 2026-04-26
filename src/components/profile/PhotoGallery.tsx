@@ -225,7 +225,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
                   onClick={() => goTo(item.groupId, item.indexInGroup)}
                   className={`gallery-thumb ${isActive ? "gallery-thumb--active" : "gallery-thumb--inactive"}`}
                 >
-                  <img src={item.url} alt="" className="w-full h-full object-cover" />
+                  <img src={item.url} alt="" className="w-full h-full object-contain bg-gray-900" />
                 </button>
               );
             })}
@@ -344,6 +344,8 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
           background: hsl(220 15% 12%);
           border: 1px solid hsl(220 13% 88%);
           box-shadow: inset 0 2px 20px hsl(240 10% 15% / 0.15);
+          aspect-ratio: 4 / 3;
+          max-height: 100%;
         }
 
         /* ── Image ── */
@@ -432,16 +434,16 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
           overflow: hidden;
           transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
           border: 2px solid transparent;
+          aspect-ratio: 4 / 3;
+          background: hsl(220 15% 12%);
         }
         .gallery-thumb--active {
           width: 72px;
-          height: 54px;
           border-color: hsl(346 77% 49%);
           box-shadow: 0 0 0 3px hsl(346 77% 49% / 0.2), 0 4px 12px hsl(346 77% 49% / 0.15);
         }
         .gallery-thumb--inactive {
           width: 52px;
-          height: 40px;
           opacity: 0.5;
           border-color: hsl(220 13% 88%);
         }

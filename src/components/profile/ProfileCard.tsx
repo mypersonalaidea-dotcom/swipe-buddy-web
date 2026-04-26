@@ -521,17 +521,17 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                         <div className="flex gap-4" style={{ alignItems: isExpanded ? 'flex-start' : 'center' }}>
                           {/* Image: morphs from 68px square to 240px tall */}
                           <div
-                            className="rounded-xl bg-gray-100 flex-shrink-0 overflow-hidden transition-all duration-500 ease-in-out"
+                            className="rounded-xl bg-gray-900 flex-shrink-0 overflow-hidden transition-all duration-500 ease-in-out"
                             style={{
-                              width: isExpanded ? 240 : 68,
-                              height: isExpanded ? 180 : 68,
+                              width: isExpanded ? 360 : 88,
+                              height: isExpanded ? 270 : 66,
                             }}
                           >
                             {validPhotos[safeIdx] ? (
                               <img
                                 src={validPhotos[safeIdx]}
                                 alt={roomName}
-                                className="w-full h-full object-cover cursor-pointer"
+                                className="w-full h-full object-contain cursor-pointer"
                                 onClick={(e) => { e.stopPropagation(); if (galleryGroups.length > 0) openGallery(room.id, safeIdx); }}
                               />
                             ) : (
@@ -650,11 +650,11 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                                           type="button"
                                           onClick={(e) => { e.stopPropagation(); setActiveRoomPhoto((p) => ({ ...p, [room.id]: idx })); }}
                                           onDoubleClick={(e) => { e.stopPropagation(); if (galleryGroups.length > 0) openGallery(room.id, idx); }}
-                                          className={`w-[72px] h-[52px] rounded-md flex-shrink-0 overflow-hidden border-2 transition-all ${
+                                          className={`w-[72px] aspect-[4/3] rounded-md flex-shrink-0 overflow-hidden border-2 bg-gray-900 transition-all ${
                                             idx === safeIdx ? 'border-rose-500' : 'border-transparent hover:border-gray-300'
                                           }`}
                                         >
-                                          <img src={photo} alt="" className="w-full h-full object-cover" />
+                                          <img src={photo} alt="" className="w-full h-full object-contain" />
                                         </button>
                                       ))}
                                     </div>
@@ -704,13 +704,13 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                       {displayPhotos.map((photo, idx) => (
                         <div
                           key={idx}
-                          className="aspect-[4/3] rounded-xl overflow-hidden bg-gray-100 cursor-pointer group/photo"
+                          className="aspect-[4/3] rounded-xl overflow-hidden bg-gray-900 cursor-pointer group/photo"
                           onClick={() => { if (galleryGroups.length > 0) openGallery('common-area', idx); }}
                         >
                           <img
                             src={photo}
                             alt={`Common area ${idx + 1}`}
-                            className="w-full h-full object-cover transition-transform duration-300 group-hover/photo:scale-105"
+                            className="w-full h-full object-contain"
                           />
                         </div>
                       ))}
@@ -722,7 +722,7 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                           <img
                             src={validCommonPhotos[MAX_VISIBLE]}
                             alt=""
-                            className="w-full h-full object-cover transition-transform duration-300 group-hover/more:scale-110"
+                            className="w-full h-full object-contain"
                           />
                           <div className="absolute inset-0 bg-gradient-to-br from-rose-500/50 via-rose-400/30 to-gray-900/60 backdrop-blur-[2px] flex flex-col items-center justify-center gap-1.5 transition-all duration-300 group-hover/more:from-rose-600/60 group-hover/more:to-gray-900/70">
                             <div className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center backdrop-blur-sm border border-white/20 shadow-lg">
