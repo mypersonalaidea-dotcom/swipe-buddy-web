@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
-  MapPin, Briefcase, GraduationCap, Home, Send, Heart, Bookmark,
+  MapPin, Briefcase, GraduationCap, Home, Send, Heart, Bookmark, Camera,
   ExternalLink, ChevronDown, DoorOpen, Calendar, Sofa, IndianRupee, Smile,
   Snowflake, Wifi, Bath, ShowerHead, Tv, Fan, UtensilsCrossed, Dumbbell,
   Car, Zap, Waves, WashingMachine, Armchair, Lamp, Lock, Refrigerator,
@@ -273,7 +273,7 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
   const getValidPhotos = (photos: string[]) => photos.filter(isValidPhoto);
 
   return (
-    <Card className="relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-lg w-full">
+    <Card className="relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-lg w-full h-[calc(100vh-112px)] flex flex-col">
       {/* ───── Soft pink header background ───── */}
       <div className="absolute inset-x-0 top-0 h-[200px] bg-rose-50 pointer-events-none" />
 
@@ -412,7 +412,7 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
       {/* ╔══════════════════════════════════════════════════════════╗
           ║ SCROLLABLE CONTENT                                     ║
           ╚══════════════════════════════════════════════════════════╝ */}
-      <CardContent className="relative z-10 space-y-7 pt-5 pb-6 px-6 max-h-[calc(100vh-340px)] overflow-y-auto">
+      <CardContent className="relative z-10 space-y-7 pt-5 pb-6 px-6 flex-1 overflow-y-auto min-h-0">
         {/* ──────── FLAT DETAILS ──────── */}
         {isLookingForFlatmate && profile.flatDetails && (
           <div className="space-y-7">
@@ -691,15 +691,51 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                     })}
                   </div>
                 )}
-                {profile.flatDetails.commonPhotos && profile.flatDetails.commonPhotos.filter(p => p && p.trim()).length > 0 && (
-                  <div className="flex gap-3 overflow-x-auto pb-1">
-                    {profile.flatDetails.commonPhotos.filter(p => p && p.trim()).map((photo, idx) => (
-                      <div key={idx} className="w-[240px] h-[180px] rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 cursor-pointer" onClick={() => { if (galleryGroups.length > 0) openGallery('common-area', idx); }}>
-                        <img src={photo} alt={`Common area ${idx + 1}`} className="w-full h-full object-cover" />
-                      </div>
-                    ))}
-                  </div>
-                )}
+                {profile.flatDetails.commonPhotos && (() => {
+                  const validCommonPhotos = profile.flatDetails.commonPhotos.filter(p => p && p.trim());
+                  if (validCommonPhotos.length === 0) return null;
+
+                  const MAX_VISIBLE = 4;
+                  const displayPhotos = validCommonPhotos.slice(0, MAX_VISIBLE);
+                  const remainingCount = validCommonPhotos.length - MAX_VISIBLE;
+
+                  return (
+                    <div className="grid grid-cols-5 gap-3">
+                      {displayPhotos.map((photo, idx) => (
+                        <div
+                          key={idx}
+                          className="aspect-[4/3] rounded-xl overflow-hidden bg-gray-100 cursor-pointer group/photo"
+                          onClick={() => { if (galleryGroups.length > 0) openGallery('common-area', idx); }}
+                        >
+                          <img
+                            src={photo}
+                            alt={`Common area ${idx + 1}`}
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover/photo:scale-105"
+                          />
+                        </div>
+                      ))}
+                      {remainingCount > 0 && (
+                        <div
+                          className="aspect-[4/3] rounded-xl overflow-hidden cursor-pointer relative group/more"
+                          onClick={() => { if (galleryGroups.length > 0) openGallery('common-area', MAX_VISIBLE); }}
+                        >
+                          <img
+                            src={validCommonPhotos[MAX_VISIBLE]}
+                            alt=""
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover/more:scale-110"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-br from-rose-500/50 via-rose-400/30 to-gray-900/60 backdrop-blur-[2px] flex flex-col items-center justify-center gap-1.5 transition-all duration-300 group-hover/more:from-rose-600/60 group-hover/more:to-gray-900/70">
+                            <div className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center backdrop-blur-sm border border-white/20 shadow-lg">
+                              <Camera className="w-5 h-5 text-white drop-shadow-sm" />
+                            </div>
+                            <span className="text-white font-bold text-[16px] drop-shadow-sm">+{remainingCount}</span>
+                            <span className="text-white/70 text-[10px] font-semibold uppercase tracking-widest">View All</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             )}
 

@@ -1142,7 +1142,7 @@ export const HomePage = () => {
           </Button>
         </div>
 
-        <div className="flex-1 h-full flex items-center justify-center py-8 px-2">
+        <div className="flex-1 h-full flex items-start justify-center pt-14 pb-14 px-2">
           {flatsLoading ? (
             <div className="flex flex-col items-center gap-3 text-muted-foreground">
               <Loader2 className="w-8 h-8 animate-spin" />
@@ -1175,7 +1175,7 @@ export const HomePage = () => {
           </Button>
         </div>
 
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-sm text-muted-foreground">
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-sm text-muted-foreground z-20 bg-white/90 backdrop-blur-sm px-4 py-1 rounded-full shadow-sm border border-gray-100">
           {currentIndex + 1} / {swipeItems.length}
         </div>
       </div>
