@@ -7,8 +7,10 @@ import {
   ExternalLink, ChevronDown, DoorOpen, Calendar, Sofa, IndianRupee, Smile,
   Snowflake, Wifi, Bath, ShowerHead, Tv, Fan, UtensilsCrossed, Dumbbell,
   Car, Zap, Waves, WashingMachine, Armchair, Lamp, Lock, Refrigerator,
+  MessageCircle, CheckCircle2, ArrowRight, Loader2,
   type LucideIcon
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 import { MAPBOX_TOKEN, GOOGLE_MAPS_API_KEY, MAP_PROVIDER } from "@/lib/maps/config";
@@ -16,11 +18,14 @@ import { GoogleMapRenderer } from "@/components/map/GoogleMapRenderer";
 import { MapboxMapRenderer } from "@/components/map/MapboxMapRenderer";
 import { getHabitIcon } from "@/constants/habits";
 import { PhotoGallery, GalleryGroup } from "@/components/profile/PhotoGallery";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, memo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useSaveProfile } from "@/hooks/useSocial";
+import { useConversations, useStartConversation } from "@/hooks/useMessaging";
+import { useSocket } from "@/contexts/SocketContext";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -98,7 +103,7 @@ interface ProfileCardProps {
   isSaved?: boolean;
 }
 
-const conversationProfileIds = ["1", "3"];
+// Removed hardcoded conversation mocks
 
 /* ── Amenity → Icon mapping ── */
 const amenityIconMap: Record<string, LucideIcon> = {
@@ -170,6 +175,52 @@ const OrganizationLogoPill = ({ icon: Icon, name, type, text }: { icon: any, nam
   );
 };
 
+interface ConversationBannerProps {
+  profileName: string;
+  onOpenChat: () => void;
+}
+
+const ConversationBanner = memo(({ profileName, onOpenChat }: ConversationBannerProps) => (
+  <div className={cn(
+    "rounded-xl px-4 py-3 flex items-center justify-between gap-4",
+    "bg-white/95 backdrop-blur-md border border-rose-100 w-full shadow-md shadow-rose-200/20",
+    "animate-in fade-in slide-in-from-top-1 duration-300"
+  )}>
+    <div className="flex items-center gap-3.5 min-w-0">
+      {/* Icon Stack */}
+      <div className="relative flex-shrink-0">
+        <div className="w-10 h-10 rounded-full bg-rose-100/80 flex items-center justify-center">
+          <MessageCircle className="w-5 h-5 text-rose-500 fill-rose-500/10" />
+        </div>
+        <div className="absolute -bottom-0.5 -right-0.5 bg-white rounded-full p-0.5 shadow-sm">
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 fill-emerald-50" />
+        </div>
+      </div>
+      
+      {/* Text Content */}
+      <div className="min-w-0">
+        <h4 className="text-[13px] font-semibold text-gray-900 leading-tight">
+          You're already in conversation
+        </h4>
+        <p className="text-[12px] text-gray-500 mt-0.5 truncate">
+          Continue your chat with <span className="font-medium text-gray-700">{profileName}</span> where you left off.
+        </p>
+      </div>
+    </div>
+
+    {/* Action Button */}
+    <Button 
+      onClick={onOpenChat}
+      className="h-9 px-4 rounded-lg bg-[#E11D48] hover:bg-rose-700 text-white text-[12px] font-medium shadow-sm transition-all hover:translate-x-0.5 active:scale-95 flex items-center gap-1.5 shrink-0"
+    >
+      Open chat
+      <ArrowRight className="w-3.5 h-3.5" />
+    </Button>
+  </div>
+));
+
+ConversationBanner.displayName = "ConversationBanner";
+
 export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isSaved = false }: ProfileCardProps) => {
   const isLookingForFlatmate = profile.searchType === "flatmate";
   const { toast } = useToast();
@@ -216,7 +267,14 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
     }
   }
 
-  const hasExistingConversation = alreadyInConversation ?? conversationProfileIds.includes(profile.id);
+  const { data: conversations } = useConversations();
+  const { mutateAsync: startConversation } = useStartConversation();
+  const { socket } = useSocket();
+  const queryClient = useQueryClient();
+  const [isSending, setIsSending] = useState(false);
+
+  const hasExistingConversation = alreadyInConversation ?? 
+    conversations?.some(conv => conv.other_user?.id === profile.id);
 
   const [message, setMessage] = useState(
     isLookingForFlatmate
@@ -243,8 +301,48 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showEmojiPicker]);
 
-  const handleSendMessage = () => {
-    navigate(`/dashboard?activeView=messages&newChat=${profile.id}`);
+  const handleSendMessage = async () => {
+    if (!message.trim() || isSending) return;
+    
+    setIsSending(true);
+    try {
+      // 1. Start or get conversation
+      const conversation = await startConversation(profile.id);
+      
+      // 2. Send message via socket
+      if (socket) {
+        socket.emit("send_message", {
+          conversationId: conversation.id,
+          content: message.trim(),
+          tempId: `temp-${Date.now()}`
+        });
+      }
+
+      // 3. Feedback & State Reset
+      toast({
+        title: "Message Sent",
+        description: `Your message to ${profile.name} has been delivered successfully.`,
+      });
+
+      setMessage("");
+      
+      // 4. Invalidate conversations to trigger UI flip to banner
+      await queryClient.invalidateQueries({ queryKey: ["conversations"] });
+
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      toast({
+        title: "Delivery Failed",
+        description: `We couldn't send your message to ${profile.name}. Please check your connection and try again.`,
+        variant: "destructive"
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleOpenExistingChat = () => {
+    window.open(`/dashboard?activeView=messages&newChat=${profile.id}`, '_blank');
   };
 
   const { mutate: toggleSaveMutation } = useSaveProfile();
@@ -346,12 +444,10 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
             {/* Conversation / Message Input block */}
             <div className="mt-3">
               {hasExistingConversation ? (
-                <div className="rounded-lg px-4 py-3 flex items-center gap-2.5 bg-rose-50/80 border border-rose-100/80 w-full h-[40px]">
-                  <span className="w-2.5 h-2.5 rounded-full bg-orange-400 flex-shrink-0" />
-                  <p className="text-[12px] text-gray-600 truncate">
-                    In conversation with <span className="font-bold text-gray-900">{profile.name}</span>
-                  </p>
-                </div>
+                <ConversationBanner 
+                  profileName={profile.name}
+                  onOpenChat={handleOpenExistingChat}
+                />
               ) : (
                 <div className="flex items-stretch gap-2.5 w-full h-[40px]">
                   <div className="flex-1 min-w-0 relative">
@@ -395,9 +491,14 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                   </div>
                   <Button
                     onClick={handleSendMessage}
-                    className="w-[40px] h-[40px] rounded-lg flex items-center justify-center bg-[#E11D48] hover:bg-rose-700 text-white shadow-sm shrink-0 p-0"
+                    disabled={isSending}
+                    className="w-[40px] h-[40px] rounded-lg flex items-center justify-center bg-[#E11D48] hover:bg-rose-700 text-white shadow-sm shrink-0 p-0 disabled:opacity-70"
                   >
-                    <Send className="h-[18px] w-[18px] stroke-[2]" />
+                    {isSending ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <Send className="h-[18px] w-[18px] stroke-[2]" />
+                    )}
                   </Button>
                 </div>
               )}

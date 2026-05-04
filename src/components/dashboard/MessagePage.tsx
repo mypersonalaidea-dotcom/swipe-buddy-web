@@ -15,6 +15,7 @@ export const MessagePage = () => {
   
   const selectedConversationId = searchParams.get("conversation");
   const targetUserId = searchParams.get("newChat"); // Requesting to chat with specific user
+  const initialMessage = searchParams.get("message");
   
   // Track all typing status locally to pass to list view. `useChat` hook handles tracking for active window.
   const [globalTypingTracker, setGlobalTypingTracker] = useState<Map<string, Set<string>>>(new Map());
@@ -26,7 +27,9 @@ export const MessagePage = () => {
       // User clicked "Message" on someone's profile
       startConversation(targetUserId, {
         onSuccess: (conversation) => {
-          setSearchParams({ activeView: "messages", conversation: conversation.id });
+          const params: any = { activeView: "messages", conversation: conversation.id };
+          if (initialMessage) params.message = initialMessage;
+          setSearchParams(params);
         },
         onError: () => {
           setSearchParams({ activeView: "messages" }); // Clear newChat on error to unblock UI

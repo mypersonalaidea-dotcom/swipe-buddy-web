@@ -17,6 +17,14 @@ import type {
   ConversationUpdatedEvent
 } from "@/lib/types/messaging";
 
+const sortConversations = (conversations: ConversationPayload[]) => {
+  return [...conversations].sort((a, b) => {
+    const aTime = a.last_message?.created_at || a.last_message_at || a.created_at;
+    const bTime = b.last_message?.created_at || b.last_message_at || b.created_at;
+    return new Date(bTime).getTime() - new Date(aTime).getTime();
+  });
+};
+
 export function useConversations() {
   const { socket } = useSocket();
   const queryClient = useQueryClient();
@@ -27,6 +35,7 @@ export function useConversations() {
       const { data } = await api.get<ConversationsResponse>("/messages/conversations");
       return data.data;
     },
+    select: sortConversations
   });
 
   useEffect(() => {
@@ -38,14 +47,13 @@ export function useConversations() {
         
         const exists = old.some(c => c.id === payload.conversationId);
         if (exists) {
-          // Replace it and sort
-          return old
-            .map(c => c.id === payload.conversationId ? { ...c, last_message: payload.last_message, last_message_at: payload.last_message.created_at } : c)
-            .sort((a, b) => {
-              const aTime = a.last_message?.created_at || a.created_at;
-              const bTime = b.last_message?.created_at || b.created_at;
-              return new Date(bTime).getTime() - new Date(aTime).getTime();
-            });
+          // Replace it and sort using our shared utility
+          const updated = old.map(c => 
+            c.id === payload.conversationId 
+              ? { ...c, last_message: payload.last_message, last_message_at: payload.last_message.created_at } 
+              : c
+          );
+          return sortConversations(updated);
         }
         
         // If not exists, we ideally fetch it but for now we'll just invalidate

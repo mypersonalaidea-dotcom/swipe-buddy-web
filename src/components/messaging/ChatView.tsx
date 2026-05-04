@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ArrowLeft, MoreVertical, Flag, User as UserIcon, ShieldOff, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -26,6 +27,7 @@ interface ChatViewProps {
 }
 
 export function ChatView({ conversation, onBack, onViewProfile }: ChatViewProps) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { isUserOnline, getUserLastSeen } = useSocket();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -46,6 +48,18 @@ export function ChatView({ conversation, onBack, onViewProfile }: ChatViewProps)
     // Auto-scroll to bottom on first load or new message (we're keeping it simple for now)
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [data?.pages[0]?.messages.length]);
+  
+  // Handle auto-sending initial message from profile card
+  const initialMessage = searchParams.get("message");
+  useEffect(() => {
+    if (initialMessage && conversation?.id && sendMessage) {
+      sendMessage(initialMessage);
+      // Clear the message from URL to prevent re-sending on refresh
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete("message");
+      setSearchParams(newParams, { replace: true });
+    }
+  }, [conversation?.id, initialMessage, sendMessage, setSearchParams, searchParams]);
 
   if (!conversation) {
     return (
