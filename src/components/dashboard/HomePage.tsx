@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { habitCategories, getCategoryForHabit } from "@/constants/habits";
-import { ChevronLeft, ChevronRight, SlidersHorizontal, ChevronDown, Home, Users, Heart, Building2, Briefcase, GraduationCap, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, SlidersHorizontal, ChevronDown, Home, Users, Heart, Building2, Briefcase, GraduationCap, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +12,7 @@ import { Slider } from "@/components/ui/slider";
 import { useFlats } from "@/hooks/useFlats";
 import { useUpdateSearchPreferences } from "@/hooks/useProfile";
 import { useSavedProfiles } from "@/hooks/useSocial";
+import { useDiscoverFeed, useMarkVisited, useClearVisited, type DiscoverCard } from "@/hooks/useDiscover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -34,7 +35,7 @@ import type { GeocodeResult, LngLat } from "@/lib/maps/types";
 // TODO: Replace these with your real AdSense publisher ID and ad slot ID
 const AD_CLIENT = "ca-pub-2938555455040927"; // Your AdSense publisher ID
 const AD_SLOT = "6643881699";                // Your AdSense ad slot ID
-const AD_INTERVAL = 5;                        // Show an ad card after every N profile cards
+const AD_INTERVAL = 3;                        // Show an ad card after every N profile cards (1 ad per batch)
 
 // ---- Types for flat details ----
 interface MediaFile {
@@ -81,33 +82,45 @@ export const HomePage = () => {
 
   const [appliedFilters, setAppliedFilters] = useState<Record<string, any>>({});
   
-  // --- Real flat profiles from API ---
+  // --- Real flat profiles from API (still used for filter-based queries) ---
   const { data: flatsData, isLoading: flatsLoading } = useFlats(appliedFilters);
   const { data: savedProfilesData = [] } = useSavedProfiles();
 
-  const profiles = (flatsData ?? []).map(flat => {
-    const profileId = flat.user_id;
-    const isSaved = savedProfilesData.some(p => p.id === profileId);
+  // --- Discover feed API ---
+  const { data: discoverData, isLoading: discoverLoading, refetch: refetchFeed } = useDiscoverFeed(1, AD_INTERVAL);
+  const { mutate: markVisited, isPending: isMarkingVisited } = useMarkVisited();
+  const { mutate: clearVisited, isPending: isClearingVisited } = useClearVisited();
+
+  // Track which profile IDs have been viewed in the current batch (for batched marking)
+  const viewedInBatchRef = useRef<Set<string>>(new Set());
+  // Track whether we've exhausted the feed
+  const [feedExhausted, setFeedExhausted] = useState(false);
+
+  // Map discover cards to the same profile shape used by ProfileCard
+  const mapDiscoverCardToProfile = useCallback((card: DiscoverCard) => {
+    const isSaved = savedProfilesData.some(p => p.id === card.id);
+    // Find matching flat data if available
+    const flat = (flatsData ?? []).find(f => f.user_id === card.id);
 
     return {
-      id: profileId, // Keep profile ID for saving/chatting
-      name: flat.user?.name ?? "Unknown",
-      age: flat.user?.age ?? 0,
-      city: flat.city ?? "Unknown",
-      state: flat.state ?? "",
-      gender: flat.user?.gender ?? "",
-      profilePicture: flat.user?.profile_picture_url ?? "",
-      searchType: "flatmate" as const,
-      isSaved: isSaved,
-      myHabits: flat.user?.user_habits ?? [],
-      lookingForHabits: [] as string[],
-      jobExperiences: (flat.user?.jobExperiencesDetailed?.length ? flat.user.jobExperiencesDetailed : flat.user?.workExperience) ?? [],
-      educationExperiences: (flat.user?.educationDetailed?.length ? flat.user.educationDetailed : flat.user?.education) ?? [],
-      flatDetails: {
-        id: flat.id, // For flat-specific operations
+      id: card.id,
+      name: card.name ?? "Unknown",
+      age: card.age ?? 0,
+      city: card.city ?? "Unknown",
+      state: card.state ?? "",
+      gender: card.gender ?? "",
+      profilePicture: card.profile_picture_url ?? "",
+      searchType: (card.search_type === "both" ? "flatmate" : card.search_type ?? "flatmate") as "flat" | "flatmate",
+      isSaved,
+      myHabits: card.user_habits ?? [],
+      lookingForHabits: card.looking_for_habits ?? [],
+      jobExperiences: (card.jobExperiencesDetailed?.length ? card.jobExperiencesDetailed : card.workExperience) ?? [],
+      educationExperiences: (card.educationDetailed?.length ? card.educationDetailed : card.education) ?? [],
+      flatDetails: flat ? {
+        id: flat.id,
         address: flat.address ?? "",
         coordinates: flat.latitude && flat.longitude
-          ? [parseFloat(flat.longitude), parseFloat(flat.latitude)] as [number, number]
+          ? [parseFloat(String(flat.longitude)), parseFloat(String(flat.latitude))] as [number, number]
           : undefined,
         flatType: flat.flat_type ?? "",
         furnishingType: flat.furnishing_type ?? "",
@@ -128,30 +141,111 @@ export const HomePage = () => {
           amenities: r.room_amenities ?? [],
           photos: r.media?.filter(m => m.media_type === "image").map(m => m.media_url) ?? [],
         })),
-      },
+      } : (card.flats?.[0] ? {
+        id: card.flats[0].id ?? card.id,
+        address: card.flats[0].address ?? "",
+        coordinates: card.flats[0].latitude && card.flats[0].longitude
+          ? [parseFloat(String(card.flats[0].longitude)), parseFloat(String(card.flats[0].latitude))] as [number, number]
+          : undefined,
+        flatType: card.flats[0].flat_type ?? "",
+        furnishingType: card.flats[0].furnishing_type ?? "",
+        description: card.flats[0].description ?? "",
+        commonAmenities: card.flats[0].common_amenities ?? [],
+        commonPhotos: card.flats[0].media?.filter((m: any) => m.media_type === "image").map((m: any) => m.media_url) ?? [],
+        rooms: (card.flats[0].rooms ?? []).map((r: any) => ({
+          id: r.id,
+          name: r.room_name || undefined,
+          type: r.room_type,
+          rent: `₹${Number(r.rent || 0).toLocaleString()}/mo`,
+          available: r.available_count,
+          securityDeposit: r.security_deposit ? `${r.security_deposit} Month` : '',
+          brokerage: r.brokerage ? `${r.brokerage} days` : '',
+          availableFrom: r.available_from ?? "",
+          furnishingType: r.furnishing_type ?? card.flats[0].furnishing_type ?? "",
+          description: r.description ?? "",
+          amenities: r.room_amenities ?? [],
+          photos: r.media?.filter((m: any) => m.media_type === "image").map((m: any) => m.media_url) ?? [],
+        })),
+      } : undefined),
     };
-  });
+  }, [savedProfilesData, flatsData]);
 
-  // ---- Build a mixed swipe stack: profiles interleaved with ad cards ----
+  const profiles = useMemo(() => {
+    if (!discoverData?.cards) return [];
+    return discoverData.cards.map(mapDiscoverCardToProfile);
+  }, [discoverData, mapDiscoverCardToProfile]);
+
+  // Update feedExhausted state when discover data changes
+  useEffect(() => {
+    if (discoverData) {
+      setFeedExhausted(discoverData.cards.length === 0 && !discoverData.pagination.hasMore);
+    }
+  }, [discoverData]);
+
+  // ---- Build a mixed swipe stack: profile cards + 1 ad card at the end of each batch ----
   type SwipeItem =
     | { type: "profile"; data: (typeof profiles)[number] }
     | { type: "ad"; key: string };
 
   const swipeItems: SwipeItem[] = useMemo(() => {
     const items: SwipeItem[] = [];
-    profiles.forEach((profile, idx) => {
+    profiles.forEach((profile) => {
       items.push({ type: "profile", data: profile });
-      // Insert an ad card after every AD_INTERVAL profiles
-      if ((idx + 1) % AD_INTERVAL === 0) {
-        items.push({ type: "ad", key: `ad-after-${idx}` });
-      }
     });
-    // Also add an ad card at the very end if the last item isn't already an ad
-    if (profiles.length > 0 && profiles.length % AD_INTERVAL !== 0) {
-      items.push({ type: "ad", key: "ad-end" });
+    // Add an ad card as the 4th card (after the 3 profile cards)
+    if (profiles.length > 0) {
+      items.push({ type: "ad", key: `ad-batch-end` });
     }
     return items;
   }, [profiles]);
+
+  // ---- Mark cards as visited & load next batch ----
+  const markCurrentBatchVisited = useCallback(() => {
+    const profileIds = profiles.map(p => p.id);
+    if (profileIds.length === 0) return;
+
+    markVisited(profileIds, {
+      onSuccess: () => {
+        viewedInBatchRef.current.clear();
+        setCurrentIndex(0);
+        // refetchFeed will be triggered by query invalidation in the hook
+      },
+      onError: () => {
+        toast({
+          title: "Error",
+          description: "Failed to update feed. Please try again.",
+          variant: "destructive",
+        });
+      },
+    });
+  }, [profiles, markVisited, toast]);
+
+  // When user reaches the ad card (last in batch) and swipes past it, load next batch
+  const handleBatchComplete = useCallback(() => {
+    markCurrentBatchVisited();
+  }, [markCurrentBatchVisited]);
+
+  // Reset feed — clears all visited history
+  const handleResetFeed = useCallback(() => {
+    clearVisited(undefined, {
+      onSuccess: () => {
+        setFeedExhausted(false);
+        setCurrentIndex(0);
+        viewedInBatchRef.current.clear();
+        toast({
+          title: "Feed Reset! 🔄",
+          description: "All profiles will now appear again.",
+        });
+      },
+      onError: () => {
+        toast({
+          title: "Error",
+          description: "Failed to reset feed. Please try again.",
+          variant: "destructive",
+        });
+      },
+    });
+  }, [clearVisited, toast]);
 
   const [userSearchType] = useState<"flat" | "flatmate" | "both">("both");
   const [hasFlatDetails, setHasFlatDetails] = useState(
@@ -369,10 +463,28 @@ export const HomePage = () => {
 
   // --- Navigation (uses swipeItems length instead of profiles) ---
   const handleNext = () => {
-    if (isAnimating || currentIndex >= swipeItems.length - 1) return;
+    if (isAnimating) return;
+
+    // If we're at the last item (ad card at end of batch), trigger next batch load
+    if (currentIndex >= swipeItems.length - 1) {
+      handleBatchComplete();
+      return;
+    }
+
     setIsAnimating(true);
     setAnimationDirection("left");
-    setTimeout(() => { setCurrentIndex(prev => prev + 1); setIsAnimating(false); setAnimationDirection(null); }, 300);
+    setTimeout(() => {
+      const nextIndex = currentIndex + 1;
+      setCurrentIndex(nextIndex);
+      setIsAnimating(false);
+      setAnimationDirection(null);
+
+      // Track profile as viewed
+      const nextItem = swipeItems[nextIndex];
+      if (nextItem?.type === "profile") {
+        viewedInBatchRef.current.add(nextItem.data.id);
+      }
+    }, 300);
   };
   const handlePrevious = () => {
     if (isAnimating || currentIndex <= 0) return;
@@ -380,6 +492,13 @@ export const HomePage = () => {
     setAnimationDirection("right");
     setTimeout(() => { setCurrentIndex(prev => prev - 1); setIsAnimating(false); setAnimationDirection(null); }, 300);
   };
+
+  // Mark the first card as viewed when the batch loads
+  useEffect(() => {
+    if (swipeItems.length > 0 && swipeItems[0]?.type === "profile") {
+      viewedInBatchRef.current.add((swipeItems[0] as any).data.id);
+    }
+  }, [swipeItems]);
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -1143,10 +1262,35 @@ export const HomePage = () => {
         </div>
 
         <div className="flex-1 h-full flex items-start justify-center pt-14 pb-14 px-2">
-          {flatsLoading ? (
+          {(discoverLoading || isMarkingVisited) ? (
             <div className="flex flex-col items-center gap-3 text-muted-foreground">
               <Loader2 className="w-8 h-8 animate-spin" />
-              <p className="text-sm">Finding matches...</p>
+              <p className="text-sm">{isMarkingVisited ? "Loading next batch..." : "Finding matches..."}</p>
+            </div>
+          ) : feedExhausted ? (
+            /* ---- Feed exhausted: Show reset button ---- */
+            <div className="flex flex-col items-center gap-5 text-center max-w-sm">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-rose-100 to-rose-200 flex items-center justify-center">
+                <Heart className="w-10 h-10 text-rose-400" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-foreground">You've seen all profiles!</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  You've browsed through all available profiles. Reset your feed to see them again.
+                </p>
+              </div>
+              <Button
+                onClick={handleResetFeed}
+                disabled={isClearingVisited}
+                className="gap-2 px-6 py-2.5 rounded-full shadow-md bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white font-medium transition-all"
+              >
+                {isClearingVisited ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+                See All Profiles Again
+              </Button>
             </div>
           ) : swipeItems[currentIndex] ? (
             <div className={animationDirection === "left" ? "animate-swipe-out-left w-full" : animationDirection === "right" ? "animate-swipe-out-right w-full" : "animate-slide-in w-full"}>
@@ -1170,14 +1314,29 @@ export const HomePage = () => {
         </div>
 
         <div className="flex-shrink-0 w-12 flex items-center justify-center">
-          <Button variant="outline" size="icon" className="h-12 w-12 rounded-full shadow-card" onClick={handleNext} disabled={currentIndex >= swipeItems.length - 1 || isAnimating}>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-12 w-12 rounded-full shadow-card"
+            onClick={handleNext}
+            disabled={isAnimating || feedExhausted}
+          >
             <ChevronRight className="h-6 w-6" />
           </Button>
         </div>
 
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-sm text-muted-foreground z-20 bg-white/90 backdrop-blur-sm px-4 py-1 rounded-full shadow-sm border border-gray-100">
-          {currentIndex + 1} / {swipeItems.length}
-        </div>
+        {!feedExhausted && swipeItems.length > 0 && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 z-20 bg-white/90 backdrop-blur-sm px-4 py-1 rounded-full shadow-sm border border-gray-100">
+            <span className="text-sm text-muted-foreground">
+              {currentIndex + 1} / {swipeItems.length}
+            </span>
+            {discoverData?.pagination && (
+              <span className="text-xs text-muted-foreground/60">
+                ({discoverData.pagination.totalCards} total)
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
