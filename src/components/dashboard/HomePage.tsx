@@ -73,7 +73,7 @@ const roomTypeLabels: Record<string, string> = {
 };
 
 export const HomePage = () => {
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(1);
   const [isAnimating, setIsAnimating] = useState(false);
   const [animationDirection, setAnimationDirection] = useState<"left" | "right" | null>(null);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -182,20 +182,24 @@ export const HomePage = () => {
     }
   }, [discoverData]);
 
-  // ---- Build a mixed swipe stack: profile cards + 1 ad card at the end of each batch ----
+  // ---- Build a mixed swipe stack: ad at start + profile cards + ad at end ----
+  // Layout: [s_ad, p1, p2, p3, e_ad]
+  // Start visibility is always at index 1 (first profile card)
   type SwipeItem =
     | { type: "profile"; data: (typeof profiles)[number] }
     | { type: "ad"; key: string };
 
   const swipeItems: SwipeItem[] = useMemo(() => {
+    if (profiles.length === 0) return [];
     const items: SwipeItem[] = [];
+    // Start ad
+    items.push({ type: "ad", key: `ad-batch-start` });
+    // Profile cards
     profiles.forEach((profile) => {
       items.push({ type: "profile", data: profile });
     });
-    // Add an ad card as the 4th card (after the 3 profile cards)
-    if (profiles.length > 0) {
-      items.push({ type: "ad", key: `ad-batch-end` });
-    }
+    // End ad
+    items.push({ type: "ad", key: `ad-batch-end` });
     return items;
   }, [profiles]);
 
@@ -207,7 +211,7 @@ export const HomePage = () => {
     markVisited(profileIds, {
       onSuccess: () => {
         viewedInBatchRef.current.clear();
-        setCurrentIndex(0);
+        setCurrentIndex(1);
         // refetchFeed will be triggered by query invalidation in the hook
       },
       onError: () => {
@@ -230,7 +234,7 @@ export const HomePage = () => {
     clearVisited(undefined, {
       onSuccess: () => {
         setFeedExhausted(false);
-        setCurrentIndex(0);
+        setCurrentIndex(1);
         viewedInBatchRef.current.clear();
         toast({
           title: "Feed Reset! 🔄",
@@ -493,10 +497,12 @@ export const HomePage = () => {
     setTimeout(() => { setCurrentIndex(prev => prev - 1); setIsAnimating(false); setAnimationDirection(null); }, 300);
   };
 
-  // Mark the first card as viewed when the batch loads
+  // Mark the first profile card as viewed when the batch loads & ensure index starts at 1
   useEffect(() => {
-    if (swipeItems.length > 0 && swipeItems[0]?.type === "profile") {
-      viewedInBatchRef.current.add((swipeItems[0] as any).data.id);
+    if (swipeItems.length > 1 && swipeItems[1]?.type === "profile") {
+      viewedInBatchRef.current.add((swipeItems[1] as any).data.id);
+      // Ensure we always start at the first profile card (index 1), not the start ad
+      setCurrentIndex(1);
     }
   }, [swipeItems]);
 
@@ -1256,7 +1262,7 @@ export const HomePage = () => {
       {/* ===================== PROFILE CARDS ===================== */}
       <div className="flex-1 flex items-center relative">
         <div className="flex-shrink-0 w-12 flex items-center justify-center">
-          <Button variant="outline" size="icon" className="h-12 w-12 rounded-full shadow-card" onClick={handlePrevious} disabled={currentIndex === 0 || isAnimating}>
+          <Button variant="outline" size="icon" className="h-12 w-12 rounded-full shadow-card" onClick={handlePrevious} disabled={currentIndex <= 0 || (currentIndex === 0 && swipeItems[0]?.type === "ad") || isAnimating}>
             <ChevronLeft className="h-6 w-6" />
           </Button>
         </div>
@@ -1325,18 +1331,27 @@ export const HomePage = () => {
           </Button>
         </div>
 
-        {!feedExhausted && swipeItems.length > 0 && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 z-20 bg-white/90 backdrop-blur-sm px-4 py-1 rounded-full shadow-sm border border-gray-100">
-            <span className="text-sm text-muted-foreground">
-              {currentIndex + 1} / {swipeItems.length}
-            </span>
-            {discoverData?.pagination && (
-              <span className="text-xs text-muted-foreground/60">
-                ({discoverData.pagination.totalCards} total)
+        {!feedExhausted && swipeItems.length > 0 && (() => {
+          // Calculate profile-only position for the counter (exclude ad cards)
+          const profileItems = swipeItems.filter(item => item.type === "profile");
+          const currentItem = swipeItems[currentIndex];
+          const isOnAd = currentItem?.type === "ad";
+          const profileIndex = isOnAd
+            ? (currentIndex === 0 ? 0 : profileItems.length) // start ad = before first, end ad = after last
+            : swipeItems.slice(0, currentIndex + 1).filter(item => item.type === "profile").length;
+          return (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 z-20 bg-white/90 backdrop-blur-sm px-4 py-1 rounded-full shadow-sm border border-gray-100">
+              <span className="text-sm text-muted-foreground">
+                {isOnAd ? (currentIndex === 0 ? "Ad" : "Ad") : `${profileIndex} / ${profileItems.length}`}
               </span>
-            )}
-          </div>
-        )}
+              {discoverData?.pagination && (
+                <span className="text-xs text-muted-foreground/60">
+                  ({discoverData.pagination.totalCards} total)
+                </span>
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
