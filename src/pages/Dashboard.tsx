@@ -9,7 +9,7 @@ import { HelpPage } from "@/components/dashboard/HelpPage";
 import { ProfileCard } from "@/components/profile/ProfileCard";
 import { mockProfiles } from "@/data/mockProfiles";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, MoreVertical, Heart, Flag, Copy, Check } from "lucide-react";
+import { ArrowLeft, MoreVertical, Heart, Flag, Copy, Check, Loader2 } from "lucide-react";
 import { useSavedProfiles, useSaveProfile } from "@/hooks/useSocial";
 import { usePublicProfile } from "@/hooks/useProfile";
 import {
@@ -60,7 +60,7 @@ const Dashboard = () => {
   const fromSource = searchParams.get("from");
 
   // Fetch profile if selected, but fall back to mock if needed for now
-  const { data: apiProfile } = usePublicProfile(profileId || undefined);
+  const { data: apiProfile, isLoading: isProfileLoading } = usePublicProfile(profileId || undefined);
   const selectedProfile = apiProfile || (profileId ? mockProfiles.find(p => p.id === profileId) : null);
 
   const isProfileSaved = profileId ? savedProfiles.some(p => p.id === profileId) : false;
@@ -99,7 +99,37 @@ const Dashboard = () => {
   };
 
   const renderContent = () => {
-    // If a profile is selected via query param, show that profile
+    // 1. If we are fetching a profile, show a centered loader
+    if (profileId && isProfileLoading) {
+      return (
+        <div className="h-screen flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-rose-500" />
+            <p className="text-sm font-medium text-gray-500">Loading profile details...</p>
+          </div>
+        </div>
+      );
+    }
+
+    // 2. If a profile was requested but not found, show a friendly error
+    if (profileId && !selectedProfile) {
+      return (
+        <div className="h-screen flex flex-col items-center justify-center p-4 text-center">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+            <Flag className="h-8 w-8 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900">Profile Not Found</h3>
+          <p className="text-gray-500 max-w-xs mt-2 mb-6">
+            The profile you are looking for might have been removed or the link is incorrect.
+          </p>
+          <Button onClick={() => setSearchParams({})}>
+            Go back to Home
+          </Button>
+        </div>
+      );
+    }
+
+    // 3. If a profile is selected via query param, show that profile
     if (selectedProfile) {
       return (
         <div className="h-screen flex flex-col p-4">

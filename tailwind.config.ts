@@ -126,16 +126,6 @@ export default {
 						opacity: '0'
 					}
 				},
-				'slide-in': {
-					'0%': {
-						transform: 'translateX(20px)',
-						opacity: '0'
-					},
-					'100%': {
-						transform: 'translateX(0)',
-						opacity: '1'
-					}
-				},
 				'shake': {
 					'0%, 100%': { transform: 'translateX(0)' },
 					'10%, 30%, 50%, 70%, 90%': { transform: 'translateX(-4px)' },

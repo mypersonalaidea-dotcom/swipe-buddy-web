@@ -94,16 +94,133 @@ export const useMyProfile = () => {
   });
 };
 
+// ---- Mapper: API → ProfileCard-compatible format ----
+// The backend returns snake_case keys and nested Prisma relations.
+// ProfileCard expects camelCase keys with a specific structure.
+// This function bridges the gap in a single, reusable place.
+
+function mapApiToProfile(raw: any): any {
+  if (!raw) return null;
+
+  // ── Habits (flatten from { habit: { label } } → string[]) ────────────
+  const myHabits: string[] = Array.isArray(raw.user_habits)
+    ? raw.user_habits
+        .map((uh: any) => (typeof uh === 'string' ? uh : uh.habit?.label || uh.habit_label))
+        .filter(Boolean)
+    : [];
+
+  const lookingForHabits: string[] = Array.isArray(raw.looking_for_habits)
+    ? raw.looking_for_habits
+        .map((uh: any) => (typeof uh === 'string' ? uh : uh.habit?.label || uh.habit_label))
+        .filter(Boolean)
+    : [];
+
+  // ── Job Experiences (structured objects for rich display) ─────────────
+  const jobExperiences: any[] = Array.isArray(raw.job_experiences)
+    ? raw.job_experiences.map((job: any) => ({
+        id: job.id,
+        position: job.position?.common_name || job.position_name || '',
+        company: job.company?.name || job.company_name || '',
+        companyLogo: job.company?.logo_url || null,
+        companyWebsite: job.company?.website || null,
+        fromYear: job.from_year || '',
+        tillYear: job.till_year || '',
+        currentlyWorking: job.currently_working || false,
+      })).filter((j: any) => j.position || j.company)
+    : (raw.jobExperiencesDetailed?.length
+        ? raw.jobExperiencesDetailed
+        : (raw.workExperience ?? []));
+
+  // ── Education Experiences (structured objects for rich display) ───────
+  const educationExperiences: any[] = Array.isArray(raw.education_experiences)
+    ? raw.education_experiences.map((edu: any) => ({
+        id: edu.id,
+        institution: edu.institution?.name || edu.institution_name || '',
+        degree: edu.degree?.common_name || edu.degree_name || '',
+        institutionLogo: edu.institution?.logo_url || null,
+        startYear: edu.start_year || '',
+        endYear: edu.end_year || '',
+      })).filter((e: any) => e.institution || e.degree)
+    : (raw.educationDetailed?.length
+        ? raw.educationDetailed
+        : (raw.education ?? []));
+
+  // ── Flat Details (first active flat → structured flatDetails) ─────────
+  let flatDetails: any = undefined;
+  const flat = Array.isArray(raw.flats) && raw.flats.length > 0 ? raw.flats[0] : null;
+  if (flat) {
+    flatDetails = {
+      id: flat.id,
+      address: flat.address ?? '',
+      coordinates: flat.latitude != null && flat.longitude != null
+        ? [Number(flat.longitude), Number(flat.latitude)] as [number, number]
+        : undefined,
+      flatType: flat.flat_type ?? '',
+      furnishingType: flat.furnishing_type ?? '',
+      description: flat.description ?? '',
+      commonAmenities: Array.isArray(flat.common_amenities)
+        ? flat.common_amenities
+            .map((ca: any) => (typeof ca === 'string' ? ca : ca.amenity?.name || ca.name))
+            .filter(Boolean)
+        : [],
+      commonPhotos: Array.isArray(flat.photos)
+        ? flat.photos
+        : (flat.media ?? [])
+            .filter((m: any) => m.media_type === 'image')
+            .map((m: any) => m.media_url)
+            .filter(Boolean),
+      rooms: (flat.rooms ?? []).map((r: any) => ({
+        id: r.id,
+        name: r.room_name || undefined,
+        type: r.room_type ?? 'private',
+        rent: `₹${Number(r.rent || 0).toLocaleString()}/mo`,
+        available: r.available_count ?? 1,
+        securityDeposit: r.security_deposit ? `${r.security_deposit} Month` : '',
+        brokerage: r.brokerage ? `${r.brokerage} days` : '',
+        availableFrom: r.available_from ?? '',
+        furnishingType: r.furnishing_type ?? flat.furnishing_type ?? '',
+        description: r.description ?? '',
+        amenities: Array.isArray(r.room_amenities)
+          ? r.room_amenities
+              .map((ra: any) => (typeof ra === 'string' ? ra : ra.amenity?.name || ra.name))
+              .filter(Boolean)
+          : [],
+        photos: Array.isArray(r.photos)
+          ? r.photos
+          : (r.media ?? [])
+              .filter((m: any) => m.media_type === 'image')
+              .map((m: any) => m.media_url)
+              .filter(Boolean),
+      })),
+    };
+  }
+
+  return {
+    // Pass through all raw fields so other consumers still work
+    ...raw,
+    // Override with ProfileCard-compatible keys
+    profilePicture: raw.profile_picture_url ?? '',
+    searchType: (raw.search_type === 'flatmate' || raw.search_type === 'both' || (Array.isArray(raw.flats) && raw.flats.length > 0))
+      ? 'flatmate'
+      : 'flat',
+    myHabits,
+    lookingForHabits,
+    jobExperiences,
+    educationExperiences,
+    flatDetails,
+  };
+}
+
 export const usePublicProfile = (id: string | undefined) => {
-  return useQuery<UserProfile>({
+  return useQuery<any>({
     queryKey: ["profile", id],
     queryFn: async () => {
       try {
         console.log(`[usePublicProfile] Fetching profile for ID: ${id}`);
         const res = await api.get(`/profile/${id}`);
         console.log("[usePublicProfile] API Response:", res.data);
-        // Backend usually returns { success: true, data: { ...profile... } }
-        return res.data.data || res.data; 
+        const raw = res.data.data || res.data;
+        return mapApiToProfile(raw);
       } catch (err: any) {
         console.error(`[usePublicProfile] Error fetching profile ${id}:`, err?.response?.data || err.message);
         throw err;
@@ -112,6 +229,7 @@ export const usePublicProfile = (id: string | undefined) => {
     enabled: !!id,
   });
 };
+
 
 export const useUpdateProfile = () => {
   const qc = useQueryClient();

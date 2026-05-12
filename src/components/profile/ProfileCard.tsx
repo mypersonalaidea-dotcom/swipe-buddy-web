@@ -18,7 +18,7 @@ import { GoogleMapRenderer } from "@/components/map/GoogleMapRenderer";
 import { MapboxMapRenderer } from "@/components/map/MapboxMapRenderer";
 import { getHabitIcon } from "@/constants/habits";
 import { PhotoGallery, GalleryGroup } from "@/components/profile/PhotoGallery";
-import { useState, useRef, useEffect, memo, useCallback } from "react";
+import { useState, useRef, useEffect, memo } from "react";
 import { createPortal } from "react-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useSaveProfile } from "@/hooks/useSocial";
@@ -78,21 +78,19 @@ export interface Profile {
   state: string;
   profilePicture: string;
   searchType: "flat" | "flatmate";
-  myHabits: string[];
-  lookingForHabits: string[];
-  jobExperiences: JobExperience[] | string[];
-  educationExperiences: EducationExperience[] | string[];
-  workExperience?: string[];
-  education?: string[];
+  myHabits?: string[];
+  lookingForHabits?: string[];
+  jobExperiences?: (JobExperience | string)[];
+  educationExperiences?: (EducationExperience | string)[];
   flatDetails?: {
     address: string;
     coordinates?: [number, number];
     flatType?: string;
     furnishingType: string;
     description?: string;
-    commonAmenities: string[];
-    commonPhotos: string[];
-    rooms: Room[];
+    commonAmenities?: string[];
+    commonPhotos?: string[];
+    rooms?: Room[];
   };
 }
 
@@ -247,8 +245,8 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
   // Build gallery groups from rooms + common area
   const galleryGroups: GalleryGroup[] = [];
   if (profile.flatDetails) {
-    profile.flatDetails.rooms.forEach((room, ri) => {
-      const photos = room.photos.filter(p => p && p.trim());
+    (profile.flatDetails.rooms ?? []).forEach((room, ri) => {
+      const photos = (room.photos ?? []).filter(p => p && p.trim());
       if (photos.length > 0) {
         galleryGroups.push({
           id: room.id,
@@ -281,6 +279,15 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
       ? `Hey! ${profile.name}, I'm looking for a place and your listing looks great. Can we talk?`
       : `Hey! ${profile.name}, I've got a flat vacancy. Want to know the details?`
   );
+
+  // Sync message when profile changes (prevents stale greetings from previous cards)
+  useEffect(() => {
+    setMessage(
+      isLookingForFlatmate
+        ? `Hey! ${profile.name}, I'm looking for a place and your listing looks great. Can we talk?`
+        : `Hey! ${profile.name}, I've got a flat vacancy. Want to know the details?`
+    );
+  }, [profile.id, profile.name, isLookingForFlatmate]);
 
   const navigate = useNavigate();
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -371,48 +378,58 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
   const getValidPhotos = (photos: string[]) => photos.filter(isValidPhoto);
 
   return (
-    <Card className="relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-lg w-full h-[calc(100vh-112px)] flex flex-col">
+    <Card className="relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-lg w-full h-[calc(100vh-112px)] min-h-[580px] flex flex-col">
       {/* ───── Soft pink header background ───── */}
-      <div className="absolute inset-x-0 top-0 h-[200px] bg-rose-50 pointer-events-none" />
 
       {/* ╔══════════════════════════════════════════════════════════╗
           ║ HEADER & MESSAGE SECTION                                   ║
           ╚══════════════════════════════════════════════════════════╝ */}
-      <div className="relative z-10 px-6 pt-6 pb-6 w-full">
-        <div className="flex items-stretch gap-6 w-full">
+      <div className="relative z-10 px-3 pt-3 pb-3 sm:px-4 sm:pt-4 sm:pb-4 md:px-5 md:pt-5 md:pb-5 lg:px-6 lg:pt-6 lg:pb-6 w-full bg-rose-50">
+        <div className="flex flex-col sm:flex-row sm:items-stretch gap-3 lg:gap-6 w-full">
           {/* ── Left Col: Profile photo (large rounded square) ── */}
-          <div className="relative flex-shrink-0">
-            <div className="w-[148px] h-[148px] rounded-[32px] overflow-hidden border-[4px] border-white shadow-sm bg-white">
+          <div className="relative flex-shrink-0 self-center sm:self-start">
+            <div className="w-[100px] h-[100px] rounded-[22px] sm:w-[120px] sm:h-[120px] sm:rounded-[26px] md:w-[132px] md:h-[132px] md:rounded-[28px] lg:w-[148px] lg:h-[148px] lg:rounded-[32px] min-w-[80px] min-h-[80px] max-w-[148px] max-h-[148px] overflow-hidden border-[4px] border-white shadow-sm bg-white">
               {isValidPhoto(profile.profilePicture) ? (
-                <img src={profile.profilePicture} alt={profile.name} className="w-full h-full object-cover rounded-[28px]" />
+                <img src={profile.profilePicture} alt={profile.name} className="w-full h-full object-cover rounded-[18px] sm:rounded-[22px] md:rounded-[24px] lg:rounded-[28px]" />
               ) : (
-                <div className="w-full h-full bg-gray-100 flex items-center justify-center rounded-[28px]">
+                <div className="w-full h-full bg-gray-100 flex items-center justify-center rounded-[18px] sm:rounded-[22px] md:rounded-[24px] lg:rounded-[28px]">
                   <Home className="w-10 h-10 text-gray-300" />
                 </div>
               )}
             </div>
           </div>
 
-          {/* ── Right Col: Info + Actions ── */}
-          <div className="flex-1 min-w-0 flex flex-col justify-between py-1">
+          {/* ── Info block (full-width on mobile, right col on sm+) ── */}
+          <div className="flex-1 min-w-0 flex flex-col sm:justify-between py-1">
             {/* Top Info block */}
             <div className="flex flex-col flex-1">
               {/* Row: Name + Bookmark + Badge */}
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-[20px] font-bold text-[#2A2B3D] leading-tight flex items-baseline gap-1">
-                    {profile.name}<span className="text-[18px] font-semibold text-[#8C8D9E]">,{profile.age}</span>
+              <div className="flex items-start justify-between gap-x-2">
+                {/* Left: name, age, location, + badge inline on mobile */}
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-[13px] sm:text-[18px] lg:text-[20px] font-bold text-[#2A2B3D] leading-tight flex items-baseline gap-1">
+                    <span className="truncate">{profile.name}</span>
+                    <span className="text-[11px] sm:text-[16px] lg:text-[18px] font-semibold text-[#8C8D9E] flex-shrink-0">,{profile.age}</span>
                   </h2>
-                  <p className="flex items-center gap-1.5 text-[12px] text-[#71738B] mt-1 font-medium">
+                  <p className="flex items-center gap-1.5 text-[11px] sm:text-[12px] text-[#71738B] mt-1 font-medium">
                     <MapPin className="w-3.5 h-3.5 text-[#F43F5E] flex-shrink-0 stroke-[2.5]" />
-                    {profile.city}, {profile.state}
+                    <span className="truncate">{profile.city}, {profile.state}</span>
                   </p>
+                  {/* Badge below location — mobile only */}
+                  <Badge className={`sm:hidden mt-1.5 px-2.5 py-1 text-[10px] font-semibold rounded-lg border-0 shadow-sm self-start ${
+                    isLookingForFlatmate
+                      ? "bg-[#E11D48] text-white hover:bg-[#E11D48]"
+                      : "bg-blue-600 text-white hover:bg-blue-600"
+                  }`}>
+                    {isLookingForFlatmate ? "Has Flat" : "Looking for Flat"}
+                  </Badge>
                 </div>
-                <div className="flex items-center gap-3.5 flex-shrink-0">
+                {/* Right: bookmark always + badge on sm+ only */}
+                <div className="flex items-center gap-2 sm:gap-3.5 flex-shrink-0">
                   <button onClick={handleSaveProfile} className="hover:opacity-70 transition-opacity">
                     <Bookmark className={`w-[18px] h-[18px] ${saved ? "fill-[#71738B] text-[#71738B] stroke-[2]" : "text-[#A0A2B8] stroke-[2]"}`} />
                   </button>
-                  <Badge className={`px-3.5 py-1.5 text-[11px] font-semibold rounded-lg border-0 shadow-sm ${
+                  <Badge className={`hidden sm:inline-flex px-3.5 py-1.5 text-[11px] font-semibold rounded-lg border-0 shadow-sm ${
                     isLookingForFlatmate
                       ? "bg-[#E11D48] text-white hover:bg-[#E11D48]"
                       : "bg-blue-600 text-white hover:bg-blue-600"
@@ -423,16 +440,16 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
               </div>
 
               {/* Pills: Job + Education */}
-              <div className="flex flex-wrap gap-2.5 mt-2.5">
-                {profile.jobExperiences.length > 0 && (() => {
-                  const job = profile.jobExperiences[0];
+              <div className="flex flex-wrap gap-2 mt-2 sm:gap-2.5 sm:mt-2.5">
+                {(profile.jobExperiences?.length ?? 0) > 0 && (() => {
+                  const job = profile.jobExperiences![0];
                   const isString = typeof job === 'string';
                   const jobText = isString ? job : `${job.position} at ${job.company}`;
                   const jobName = isString ? job.split(' at ')[1] || job : job.company;
                   return <OrganizationLogoPill type="job" icon={Briefcase} name={jobName} text={jobText} />;
                 })()}
-                {profile.educationExperiences.length > 0 && (() => {
-                  const edu = profile.educationExperiences[0];
+                {(profile.educationExperiences?.length ?? 0) > 0 && (() => {
+                  const edu = profile.educationExperiences![0];
                   const isString = typeof edu === 'string';
                   const eduText = isString ? edu : `${edu.degree || 'Degree'} from ${edu.institution}`;
                   const eduName = isString ? edu.split(' from ')[1] || edu : edu.institution;
@@ -442,14 +459,14 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
             </div>
 
             {/* Conversation / Message Input block */}
-            <div className="mt-3">
+            <div className="mt-2 sm:mt-3">
               {hasExistingConversation ? (
                 <ConversationBanner 
                   profileName={profile.name}
                   onOpenChat={handleOpenExistingChat}
                 />
               ) : (
-                <div className="flex items-stretch gap-2.5 w-full h-[40px]">
+                <div className="flex items-stretch gap-2 w-full h-[32px] sm:h-[36px] lg:h-[40px] min-h-[30px] max-h-[44px]">
                   <div className="flex-1 min-w-0 relative">
                     <input
                       value={message}
@@ -492,7 +509,7 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                   <Button
                     onClick={handleSendMessage}
                     disabled={isSending}
-                    className="w-[40px] h-[40px] rounded-lg flex items-center justify-center bg-[#E11D48] hover:bg-rose-700 text-white shadow-sm shrink-0 p-0 disabled:opacity-70"
+                    className="w-[36px] h-[36px] lg:w-[40px] lg:h-[40px] min-w-[34px] min-h-[34px] max-w-[44px] max-h-[44px] rounded-lg flex items-center justify-center bg-[#E11D48] hover:bg-rose-700 text-white shadow-sm shrink-0 p-0 disabled:opacity-70"
                   >
                     {isSending ? (
                       <Loader2 className="h-5 w-5 animate-spin" />
@@ -513,46 +530,46 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
       {/* ╔══════════════════════════════════════════════════════════╗
           ║ SCROLLABLE CONTENT                                     ║
           ╚══════════════════════════════════════════════════════════╝ */}
-      <CardContent className="relative z-10 space-y-7 pt-5 pb-6 px-6 flex-1 overflow-y-auto min-h-0">
+      <CardContent className="relative z-10 space-y-5 sm:space-y-7 pt-3 pb-3 px-3 sm:pt-4 sm:pb-4 sm:px-4 md:pt-5 md:pb-5 md:px-5 lg:pt-5 lg:pb-6 lg:px-6 flex-1 overflow-y-auto min-h-0">
         {/* ──────── FLAT DETAILS ──────── */}
-        {isLookingForFlatmate && profile.flatDetails && (
+        {profile.flatDetails && (
           <div className="space-y-7">
             {/* Flat info card */}
             <div className="space-y-3">
-              <h3 className="flex items-center gap-2.5 text-[14px] font-semibold uppercase tracking-[0.08em] text-gray-500">
-                <Home className="w-5 h-5 text-rose-500" />
+              <h3 className="flex items-center gap-2.5 text-[12px] md:text-[13px] lg:text-[14px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+                <Home className="w-4 h-4 md:w-5 md:h-5 text-rose-500" />
                 FLAT DETAILS
               </h3>
               <div className="rounded-xl border border-gray-200/70 overflow-hidden">
                 <div className="flex flex-col md:flex-row">
                   {/* Left: address + pills + description */}
-                  <div className="flex-1 p-5 space-y-3">
-                    <p className="flex items-start gap-2 text-[13px] text-gray-700 leading-snug">
+                  <div className="flex-1 p-3 sm:p-5 space-y-2 sm:space-y-3">
+                    <p className="flex items-start gap-2 text-[11px] sm:text-[13px] text-gray-700 leading-snug">
                       <MapPin className="w-4 h-4 mt-0.5 text-rose-500 flex-shrink-0" />
                       {profile.flatDetails.address}
                     </p>
                     <div className="flex flex-wrap items-center gap-2">
                       {profile.flatDetails.flatType && (
-                        <span className="inline-flex items-center gap-1.5 text-[12px] px-3 py-[5px] rounded-full border border-gray-200 text-gray-700 font-medium">
-                          <Home className="w-3.5 h-3.5 text-gray-400" />
+                        <span className="inline-flex items-center gap-1.5 text-[10px] sm:text-[12px] px-2 sm:px-3 py-[3px] sm:py-[5px] rounded-full border border-gray-200 text-gray-700 font-medium">
+                          <Home className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gray-400" />
                           {flatTypeLabels[profile.flatDetails.flatType] || profile.flatDetails.flatType}
                         </span>
                       )}
                       {profile.flatDetails.furnishingType && (
-                        <span className="inline-flex items-center gap-1.5 text-[12px] px-3 py-[5px] rounded-full border border-gray-200 text-gray-700 font-medium capitalize">
-                          <Sofa className="w-3.5 h-3.5 text-gray-400" />
+                        <span className="inline-flex items-center gap-1.5 text-[10px] sm:text-[12px] px-2 sm:px-3 py-[3px] sm:py-[5px] rounded-full border border-gray-200 text-gray-700 font-medium capitalize">
+                          <Sofa className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gray-400" />
                           {profile.flatDetails.furnishingType}
                         </span>
                       )}
                     </div>
                     {profile.flatDetails.description && (
-                      <p className="text-[13px] text-gray-500 leading-relaxed">
+                      <p className="text-[11px] sm:text-[13px] text-gray-500 leading-relaxed">
                         {profile.flatDetails.description}
                       </p>
                     )}
                   </div>
                   {/* Right: Map (50% width) */}
-                  <div className="w-full md:flex-1 h-48 md:h-auto min-h-[180px] bg-rose-50/30 border-t md:border-t-0 md:border-l border-gray-200/70 flex items-center justify-center overflow-hidden relative">
+                  <div className="w-full md:flex-1 h-48 md:h-auto min-h-[160px] max-h-[280px] bg-rose-50/30 border-t md:border-t-0 md:border-l border-gray-200/70 flex items-center justify-center overflow-hidden relative">
                     {(() => {
                       const coords = profile.flatDetails.coordinates;
                       if (!coords) {
@@ -599,12 +616,12 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
 
             {/* ──────── AVAILABLE ROOMS ──────── */}
             <div className="space-y-3">
-              <h3 className="flex items-center gap-2.5 text-[14px] font-semibold uppercase tracking-[0.08em] text-gray-500">
-                <DoorOpen className="w-5 h-5 text-rose-500" />
+              <h3 className="flex items-center gap-2.5 text-[12px] md:text-[13px] lg:text-[14px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+                <DoorOpen className="w-4 h-4 md:w-5 md:h-5 text-rose-500" />
                 AVAILABLE ROOMS
               </h3>
               <div className="space-y-3">
-                {profile.flatDetails.rooms.map((room) => {
+                {(profile.flatDetails?.rooms ?? []).map((room) => {
                   const isExpanded = expandedRooms.has(room.id);
                   const roomName = room.name || `Room ${room.id}`;
                   const roomType = room.type.charAt(0).toUpperCase() + room.type.slice(1);
@@ -618,15 +635,19 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                       className="rounded-xl border border-gray-200/70 overflow-hidden cursor-pointer hover:bg-gray-50/30 transition-colors"
                       onClick={() => toggleRoom(room.id)}
                     >
-                      <div className="p-4 sm:px-5">
-                        <div className="flex gap-4" style={{ alignItems: isExpanded ? 'flex-start' : 'center' }}>
+                      <div className="p-3 sm:p-4 sm:px-5">
+                        <div className={cn("flex gap-2 sm:gap-4", isExpanded ? "flex-col lg:flex-row lg:items-start" : "flex-row items-center")}>
                           {/* Image: morphs from 68px square to 240px tall */}
                           <div
-                            className="rounded-xl bg-gray-900 flex-shrink-0 overflow-hidden transition-all duration-500 ease-in-out"
-                            style={{
-                              width: isExpanded ? 360 : 88,
-                              height: isExpanded ? 270 : 66,
-                            }}
+                            className={cn(
+                              "rounded-xl bg-gray-900 overflow-hidden transition-all duration-500 ease-in-out",
+                              isExpanded
+                                // Mobile/iPad portrait: full-width, pushed below all content
+                                // Laptop+ (lg): side-by-side left, original 360×270px (4:3) dimensions
+                                ? "w-full aspect-[4/3] order-last mt-3 flex-shrink-0 lg:order-first lg:w-[360px] lg:h-[270px] lg:aspect-auto lg:mt-0"
+                                // Collapsed: small thumbnail on the left at all sizes
+                                : "flex-shrink-0 order-first aspect-[4/3] w-[50px] sm:w-[80px] lg:w-[88px] min-w-[44px] max-w-[88px]"
+                            )}
                           >
                             {validPhotos[safeIdx] ? (
                               <img
@@ -648,10 +669,10 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                             {/* Header row: always visible */}
                             <div className="flex items-start justify-between">
                               <div>
-                                <h4 className={`font-bold text-gray-900 leading-tight transition-all duration-300 ${isExpanded ? 'text-[18px]' : 'text-[15px]'}`}>
+                                <h4 className={`font-bold text-gray-900 leading-tight transition-all duration-300 ${isExpanded ? 'text-[16px] sm:text-[18px]' : 'text-[12px] sm:text-[15px]'}`}>
                                   {roomName}
                                 </h4>
-                                <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-[3px] rounded-full bg-gray-100 text-gray-600 font-medium mt-1.5">
+                                <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] px-2 sm:px-2.5 py-[3px] rounded-full bg-gray-100 text-gray-600 font-medium mt-1">
                                   <DoorOpen className="w-3 h-3 text-gray-400" />
                                   {roomType}
                                 </span>
@@ -662,7 +683,7 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                                 >
                                   <div className="overflow-hidden">
                                     {room.description && (
-                                      <p className="text-[12px] text-gray-500 leading-relaxed mt-1.5">{room.description}</p>
+                                      <p className="text-[10px] sm:text-[12px] text-gray-500 leading-relaxed mt-1.5">{room.description}</p>
                                     )}
                                   </div>
                                 </div>
@@ -672,7 +693,7 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                                   style={{ gridTemplateRows: isExpanded ? '0fr' : '1fr' }}
                                 >
                                   <div className="overflow-hidden">
-                                    <p className="text-[12px] text-gray-500 font-medium mt-1">
+                                    <p className="text-[11px] sm:text-[12px] text-gray-500 font-medium mt-1">
                                       <span className="text-gray-700 font-semibold">Rent:</span> {room.rent}
                                     </p>
                                   </div>
@@ -680,7 +701,7 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                               </div>
                               {/* Badge + Chevron */}
                               <div className="flex items-center gap-2 flex-shrink-0">
-                                <Badge className="bg-rose-50 text-rose-600 border border-rose-200 text-[11px] font-semibold px-3 py-1 rounded-full hover:bg-rose-50">
+                                <Badge className="bg-rose-50 text-rose-600 border border-rose-200 text-[10px] sm:text-[11px] font-semibold px-2 sm:px-3 py-0.5 sm:py-1 rounded-full hover:bg-rose-50">
                                   {room.available} Available
                                 </Badge>
                                 <ChevronDown className={`w-5 h-5 text-gray-400 flex-shrink-0 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
@@ -693,24 +714,24 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                               style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
                             >
                               <div className="overflow-hidden">
-                                <div className="pt-4 space-y-4">
+                                <div className="pt-3 sm:pt-4 space-y-3 sm:space-y-4">
                                   {/* 4-column grid: Rent | Deposit | Brokerage | Available From */}
-                                  <div className="grid grid-cols-4 gap-x-4 gap-y-3">
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-2 sm:gap-x-3 gap-y-2 sm:gap-y-3 lg:gap-x-4">
                                     <div>
                                       <p className="text-[10px] uppercase tracking-[0.1em] text-gray-400 font-bold flex items-center gap-1">
                                         <IndianRupee className="w-3 h-3" /> RENT
                                       </p>
-                                      <p className="text-[14px] font-bold text-gray-900 mt-0.5">{room.rent}</p>
+                                      <p className="text-[12px] sm:text-[14px] font-bold text-gray-900 mt-0.5">{room.rent}</p>
                                     </div>
                                     <div>
                                       <p className="text-[10px] uppercase tracking-[0.1em] text-gray-400 font-bold">DEPOSIT</p>
-                                      <p className={`text-[14px] font-bold mt-0.5 ${room.securityDeposit ? 'text-gray-900' : 'text-gray-400'}`}>
+                                      <p className={`text-[12px] sm:text-[14px] font-bold mt-0.5 ${room.securityDeposit ? 'text-gray-900' : 'text-gray-400'}`}>
                                         {room.securityDeposit || 'No Deposit'}
                                       </p>
                                     </div>
                                     <div>
                                       <p className="text-[10px] uppercase tracking-[0.1em] text-gray-400 font-bold">BROKERAGE</p>
-                                      <p className={`text-[14px] font-bold mt-0.5 ${room.brokerage ? 'text-gray-900' : 'text-gray-400'}`}>
+                                      <p className={`text-[12px] sm:text-[14px] font-bold mt-0.5 ${room.brokerage ? 'text-gray-900' : 'text-gray-400'}`}>
                                         {room.brokerage || 'No Brokerage'}
                                       </p>
                                     </div>
@@ -718,20 +739,20 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                                       <p className="text-[10px] uppercase tracking-[0.1em] text-gray-400 font-bold flex items-center gap-1">
                                         <Calendar className="w-3 h-3" /> AVAILABLE FROM
                                       </p>
-                                      <p className="text-[14px] font-bold text-gray-900 mt-0.5">{room.availableFrom || 'Immediately'}</p>
+                                      <p className="text-[12px] sm:text-[14px] font-bold text-gray-900 mt-0.5">{room.availableFrom || 'Immediately'}</p>
                                     </div>
                                   </div>
 
                                   {/* Room Amenities */}
-                                  {room.amenities.length > 0 && (
+                                  {(room.amenities?.length ?? 0) > 0 && (
                                     <div>
                                       <p className="text-[10px] uppercase tracking-[0.1em] text-gray-400 font-bold mb-2">ROOM AMENITIES</p>
                                       <div className="flex flex-wrap gap-1.5">
-                                        {room.amenities.map((a) => {
+                                        {(room.amenities ?? []).map((a) => {
                                           const AmenityIcon = getAmenityIcon(a);
                                           return (
-                                            <span key={a} className="inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-lg px-2.5 py-[5px] bg-gradient-to-b from-white to-gray-50 text-gray-700 border border-gray-200/80 shadow-[0_1px_2px_hsl(220_13%_91%/0.5)]">
-                                              {AmenityIcon && <AmenityIcon className="w-3.5 h-3.5 text-rose-400" />}
+                                            <span key={a} className="inline-flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-[11px] font-semibold rounded-lg px-2 sm:px-2.5 py-[3px] sm:py-[5px] bg-gradient-to-b from-white to-gray-50 text-gray-700 border border-gray-200/80 shadow-[0_1px_2px_hsl(220_13%_91%/0.5)]">
+                                              {AmenityIcon && <AmenityIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-rose-400" />}
                                               {a}
                                             </span>
                                           );
@@ -751,7 +772,7 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                                           type="button"
                                           onClick={(e) => { e.stopPropagation(); setActiveRoomPhoto((p) => ({ ...p, [room.id]: idx })); }}
                                           onDoubleClick={(e) => { e.stopPropagation(); if (galleryGroups.length > 0) openGallery(room.id, idx); }}
-                                          className={`w-[72px] aspect-[4/3] rounded-md flex-shrink-0 overflow-hidden border-2 bg-gray-900 transition-all ${
+                                          className={`w-[56px] sm:w-[72px] aspect-[4/3] rounded-md flex-shrink-0 overflow-hidden border-2 bg-gray-900 transition-all ${
                                             idx === safeIdx ? 'border-rose-500' : 'border-transparent hover:border-gray-300'
                                           }`}
                                         >
@@ -773,18 +794,18 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
             </div>
 
             {/* ──────── COMMON AREA ──────── */}
-            {(profile.flatDetails.commonAmenities.length > 0 || (profile.flatDetails.commonPhotos && profile.flatDetails.commonPhotos.filter(p => p && p.trim()).length > 0)) && (
+            {((profile.flatDetails?.commonAmenities?.length ?? 0) > 0 || (profile.flatDetails?.commonPhotos && profile.flatDetails.commonPhotos.filter(p => p && p.trim()).length > 0)) && (
               <div className="space-y-3">
-                <h3 className="flex items-center gap-2.5 text-[14px] font-semibold uppercase tracking-[0.08em] text-gray-500">
-                  <Home className="w-5 h-5 text-rose-500" />
+                <h3 className="flex items-center gap-2.5 text-[12px] md:text-[13px] lg:text-[14px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+                  <Home className="w-4 h-4 md:w-5 md:h-5 text-rose-500" />
                   COMMON AREA
                 </h3>
-                {profile.flatDetails.commonAmenities.length > 0 && (
+                {(profile.flatDetails?.commonAmenities?.length ?? 0) > 0 && (
                   <div className="flex flex-wrap gap-1.5">
-                    {profile.flatDetails.commonAmenities.map((a) => {
+                    {(profile.flatDetails?.commonAmenities ?? []).map((a) => {
                       const AmenityIcon = getAmenityIcon(a);
                       return (
-                        <span key={a} className="inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-lg px-2.5 py-[5px] bg-gradient-to-b from-white to-gray-50 text-gray-700 border border-gray-200/80 shadow-[0_1px_2px_hsl(220_13%_91%/0.5)]">
+                        <span key={a} className="inline-flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-[11px] font-semibold rounded-lg px-2 sm:px-2.5 py-[3px] sm:py-[5px] bg-gradient-to-b from-white to-gray-50 text-gray-700 border border-gray-200/80 shadow-[0_1px_2px_hsl(220_13%_91%/0.5)]">
                           {AmenityIcon && <AmenityIcon className="w-3.5 h-3.5 text-rose-400" />}
                           {a}
                         </span>
@@ -801,7 +822,7 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                   const remainingCount = validCommonPhotos.length - MAX_VISIBLE;
 
                   return (
-                    <div className="grid grid-cols-5 gap-3">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 lg:gap-3">
                       {displayPhotos.map((photo, idx) => (
                         <div
                           key={idx}
@@ -845,17 +866,17 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
         )}
 
         {/* ──────── MY HABITS ──────── */}
-        {profile.myHabits.length > 0 && (
+        {(profile.myHabits?.length ?? 0) > 0 && (
           <div className="space-y-3">
-            <h3 className="flex items-center gap-2.5 text-[14px] font-semibold uppercase tracking-[0.08em] text-gray-500">
-              <Heart className="w-5 h-5 text-rose-500" />
+            <h3 className="flex items-center gap-2.5 text-[12px] md:text-[13px] lg:text-[14px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+              <Heart className="w-4 h-4 md:w-5 md:h-5 text-rose-500" />
               MY HABITS
             </h3>
             <div className="flex flex-wrap gap-2">
-              {profile.myHabits.map((habit) => {
+              {(profile.myHabits ?? []).map((habit) => {
                 const Icon = getHabitIcon(habit);
                 return (
-                  <span key={habit} className="inline-flex items-center gap-1.5 text-[12px] font-medium rounded-full px-3 py-[5px] bg-gray-50 text-gray-700 border border-gray-200">
+                  <span key={habit} className="inline-flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-[12px] font-medium rounded-full px-2 sm:px-3 py-[3px] sm:py-[5px] bg-gray-50 text-gray-700 border border-gray-200">
                     {Icon && <Icon className="w-3.5 h-3.5 text-gray-400" />}
                     {habit}
                   </span>
@@ -867,18 +888,18 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
 
 
         {/* ──────── EXPERIENCE + EDUCATION (side by side) ──────── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 pt-1">
           {/* Experience */}
           <div className="space-y-3">
-            <h3 className="flex items-center gap-2.5 text-[14px] font-semibold uppercase tracking-[0.08em] text-gray-500">
-              <Briefcase className="w-5 h-5 text-rose-500" />
+            <h3 className="flex items-center gap-2.5 text-[12px] md:text-[13px] lg:text-[14px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+              <Briefcase className="w-4 h-4 md:w-5 md:h-5 text-rose-500" />
               EXPERIENCE
             </h3>
-            {profile.jobExperiences.length === 0 ? (
+            {(profile.jobExperiences?.length ?? 0) === 0 ? (
               <p className="text-[12px] text-gray-400 italic">Not provided</p>
             ) : (
               <div className="space-y-4">
-                {profile.jobExperiences.map((exp, idx) => {
+                {(profile.jobExperiences ?? []).map((exp, idx) => {
                   if (typeof exp === 'string') {
                     // Format: "Position at Company | 2020 – Present"
                     const [mainPart, yearsPart] = exp.split(' | ');
@@ -886,31 +907,31 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                     const position = parts[0];
                     const company = parts.length > 1 ? parts.slice(1).join(' at ') : '';
                     return (
-                    <div key={idx} className="flex items-center gap-3">
-                      <div className="w-11 h-11 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 border border-gray-200/70">
-                        <Briefcase className="w-5 h-5 text-gray-400" />
+                    <div key={idx} className="flex items-center gap-2 sm:gap-3">
+                      <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 border border-gray-200/70">
+                        <Briefcase className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
                       </div>
                       <div className="space-y-0.5 min-w-0">
-                        <p className="text-[13px] font-bold text-gray-900 leading-tight">{position}</p>
-                        {company && <p className="text-[12px] text-gray-500">{company}</p>}
-                        {yearsPart && <p className="text-[11px] text-gray-400">{yearsPart}</p>}
+                        <p className="text-[11px] sm:text-[13px] font-bold text-gray-900 leading-tight">{position}</p>
+                        {company && <p className="text-[10px] sm:text-[12px] text-gray-500">{company}</p>}
+                        {yearsPart && <p className="text-[10px] sm:text-[11px] text-gray-400">{yearsPart}</p>}
                       </div>
                     </div>
                     );
                   }
                   return (
-                    <div key={exp.id} className="flex items-center gap-3">
-                      <div className="w-11 h-11 rounded-lg bg-gray-50 flex items-center justify-center flex-shrink-0 border border-gray-200/70 overflow-hidden">
+                    <div key={exp.id} className="flex items-center gap-2 sm:gap-3">
+                      <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg bg-gray-50 flex items-center justify-center flex-shrink-0 border border-gray-200/70 overflow-hidden">
                         {exp.companyLogo ? (
                           <img src={exp.companyLogo} alt={exp.company} className="w-full h-full object-contain" />
                         ) : (
-                          <Briefcase className="w-5 h-5 text-gray-400" />
+                          <Briefcase className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
                         )}
                       </div>
                       <div className="space-y-0.5 min-w-0">
-                        <p className="text-[13px] font-bold text-gray-900 leading-tight">{exp.position}</p>
-                        <p className="text-[12px] text-gray-500">{exp.company}{exp.currentlyWorking ? ' · Full-time' : ''}</p>
-                        <p className="text-[11px] text-gray-400">{exp.fromYear} – {exp.currentlyWorking ? 'Present' : exp.tillYear}{exp.fromYear && (exp.currentlyWorking || exp.tillYear) ? (() => { const from = parseInt(exp.fromYear); const to = exp.currentlyWorking ? new Date().getFullYear() : parseInt(exp.tillYear); const diff = to - from; return diff > 0 ? ` · ${diff} yr${diff > 1 ? 's' : ''}` : ''; })() : ''}</p>
+                        <p className="text-[11px] sm:text-[13px] font-bold text-gray-900 leading-tight">{exp.position}</p>
+                        <p className="text-[10px] sm:text-[12px] text-gray-500">{exp.company}{exp.currentlyWorking ? ' · Full-time' : ''}</p>
+                        <p className="text-[10px] sm:text-[11px] text-gray-400">{exp.fromYear} – {exp.currentlyWorking ? 'Present' : exp.tillYear}{exp.fromYear && (exp.currentlyWorking || exp.tillYear) ? (() => { const from = parseInt(exp.fromYear); const to = exp.currentlyWorking ? new Date().getFullYear() : parseInt(exp.tillYear); const diff = to - from; return diff > 0 ? ` · ${diff} yr${diff > 1 ? 's' : ''}` : ''; })() : ''}</p>
                       </div>
                     </div>
                   );
@@ -921,15 +942,15 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
 
           {/* Education */}
           <div className="space-y-3">
-            <h3 className="flex items-center gap-2.5 text-[14px] font-semibold uppercase tracking-[0.08em] text-gray-500">
-              <GraduationCap className="w-5 h-5 text-rose-500" />
+            <h3 className="flex items-center gap-2.5 text-[12px] md:text-[13px] lg:text-[14px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+              <GraduationCap className="w-4 h-4 md:w-5 md:h-5 text-rose-500" />
               EDUCATION
             </h3>
-            {profile.educationExperiences.length === 0 ? (
+            {(profile.educationExperiences?.length ?? 0) === 0 ? (
               <p className="text-[12px] text-gray-400 italic">Not provided</p>
             ) : (
               <div className="space-y-4">
-                {profile.educationExperiences.map((edu, idx) => {
+                {(profile.educationExperiences ?? []).map((edu, idx) => {
                   if (typeof edu === 'string') {
                     // Format: "B.Tech from IIT Delhi | 2020 – 2024"
                     const [mainPart, yearsPart] = edu.split(' | ');
@@ -937,32 +958,32 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                     const degree = parts[0];
                     const institution = parts.length > 1 ? parts.slice(1).join(' from ') : '';
                     return (
-                    <div key={idx} className="flex items-center gap-3">
-                      <div className="w-11 h-11 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 border border-gray-200/70">
-                        <GraduationCap className="w-5 h-5 text-gray-400" />
+                    <div key={idx} className="flex items-center gap-2 sm:gap-3">
+                      <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 border border-gray-200/70">
+                        <GraduationCap className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
                       </div>
                       <div className="space-y-0.5 min-w-0">
-                        <p className="text-[13px] font-bold text-gray-900 leading-tight">{institution || degree}</p>
-                        {institution && <p className="text-[12px] text-gray-500">{degree}</p>}
-                        {yearsPart && <p className="text-[11px] text-gray-400">{yearsPart}</p>}
+                        <p className="text-[11px] sm:text-[13px] font-bold text-gray-900 leading-tight">{institution || degree}</p>
+                        {institution && <p className="text-[10px] sm:text-[12px] text-gray-500">{degree}</p>}
+                        {yearsPart && <p className="text-[10px] sm:text-[11px] text-gray-400">{yearsPart}</p>}
                       </div>
                     </div>
                     );
                   }
                   return (
-                    <div key={edu.id} className="flex items-center gap-3">
-                      <div className="w-11 h-11 rounded-lg bg-gray-50 flex items-center justify-center flex-shrink-0 border border-gray-200/70 overflow-hidden">
+                    <div key={edu.id} className="flex items-center gap-2 sm:gap-3">
+                      <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg bg-gray-50 flex items-center justify-center flex-shrink-0 border border-gray-200/70 overflow-hidden">
                         {edu.institutionLogo ? (
                           <img src={edu.institutionLogo} alt={edu.institution} className="w-full h-full object-contain" />
                         ) : (
-                          <GraduationCap className="w-5 h-5 text-gray-400" />
+                          <GraduationCap className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
                         )}
                       </div>
                       <div className="space-y-0.5 min-w-0">
-                        <p className="text-[13px] font-bold text-gray-900 leading-tight">{edu.institution}</p>
-                        <p className="text-[12px] text-gray-500">{edu.degree}</p>
+                        <p className="text-[11px] sm:text-[13px] font-bold text-gray-900 leading-tight">{edu.institution}</p>
+                        <p className="text-[10px] sm:text-[12px] text-gray-500">{edu.degree}</p>
                         {(edu.startYear || edu.endYear) && (
-                          <p className="text-[11px] text-gray-400">{edu.startYear}{edu.startYear && edu.endYear ? ' – ' : ''}{edu.endYear}</p>
+                          <p className="text-[10px] sm:text-[11px] text-gray-400">{edu.startYear}{edu.startYear && edu.endYear ? ' – ' : ''}{edu.endYear}</p>
                         )}
                       </div>
                     </div>

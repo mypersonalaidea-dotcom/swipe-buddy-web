@@ -33,17 +33,18 @@ import {
 } from "@/components/ui/dialog";
 import {
   User, Phone, Mail, Briefcase, BookOpen, Home, MapPin,
-  Edit2, Save, X, Plus, Trash2, Camera, Heart, Bookmark, Share2, Copy, Check, DoorOpen, Building2, Loader2, Calendar, ShieldCheck
+  Edit2, Save, X, Plus, Trash2, Camera, Heart, Bookmark, Share2, Copy, Check, DoorOpen, Building2, Loader2, Calendar, ShieldCheck, Eye
 } from "lucide-react";
 import { MediaUpload } from "@/components/ui/media-upload";
 import { MapPicker } from "@/components/map/MapPicker";
 import { mockProfiles } from "@/data/mockProfiles";
-import { Profile } from "@/components/profile/ProfileCard";
+import { Profile, ProfileCard } from "@/components/profile/ProfileCard";
 import {
   useMyProfile, useUpdateProfile,
   useMyJobs, useAddJob, useUpdateJob, useDeleteJob,
   useMyEducation, useAddEducation, useUpdateEducation, useDeleteEducation,
-  useMyHabits, useUpdateHabits, useUpdateSearchPreferences
+  useMyHabits, useUpdateHabits, useUpdateSearchPreferences,
+  usePublicProfile
 } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFlats, useUpdateFlat } from "@/hooks/useFlats";
@@ -182,6 +183,9 @@ export const ProfilePage = () => {
 
   const { user: authUser } = useAuth();
 
+  // ---- Preview: fetch the public version of own profile (backend only) ----
+  const { data: previewProfile, isLoading: previewLoading } = usePublicProfile(authUser?.id);
+
   // Helper: convert API profile → local UserProfile shape
   const apiToLocal = (): UserProfile => {
     // Map the user's first flat (if any) into the local flatDetails shape
@@ -301,6 +305,7 @@ export const ProfilePage = () => {
   const [, setSearchParams] = useSearchParams();
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   // ── OTP Verification State (same as signup form) ──
   const OTP_MODE = (import.meta as any).env?.VITE_OTP_MODE || "hardcoded";
@@ -1132,6 +1137,7 @@ export const ProfilePage = () => {
 
             {/* Action buttons */}
             <div className="flex gap-2 flex-shrink-0">
+
               <Button variant="outline" onClick={() => setIsShareDialogOpen(true)}
                       className="rounded-xl border-gray-200 text-gray-600 hover:border-rose-300 hover:text-rose-500 transition-colors">
                 <Share2 className="w-4 h-4 mr-2" /> Share
@@ -2414,6 +2420,36 @@ export const ProfilePage = () => {
         </Tabs>
         </div> {/* Close px-4 content wrapper */}
       </div> {/* Close max-w-4xl */}
+
+      {/* Preview Dialog — shows the saved, published profile exactly as other users see it */}
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="max-w-[480px] w-full h-[calc(100vh-48px)] p-0 overflow-hidden bg-white border border-gray-200 shadow-2xl ring-0 focus:ring-0 outline-none rounded-2xl flex flex-col">
+          {/* Header strip */}
+          <div className="flex items-center gap-2 px-5 py-3 border-b border-gray-100 bg-rose-50/60 flex-shrink-0">
+            <Eye className="w-4 h-4 text-rose-500 flex-shrink-0" />
+            <span className="text-sm font-semibold text-gray-700">Preview — how others see you</span>
+          </div>
+          {/* Card area — fills the remaining height, letting ProfileCard use calc(100vh-112px) naturally */}
+          <div className="flex-1 overflow-hidden">
+            {previewLoading ? (
+              <div className="h-full flex flex-col items-center justify-center gap-3 text-gray-400">
+                <Loader2 className="w-8 h-8 animate-spin text-rose-400" />
+                <p className="text-sm font-medium">Loading your profile...</p>
+              </div>
+            ) : previewProfile ? (
+              <ProfileCard
+                profile={previewProfile}
+                alreadyInConversation={true}
+              />
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center gap-2 text-gray-400 px-6 text-center">
+                <p className="text-sm font-medium">Could not load preview.</p>
+                <p className="text-xs text-gray-300">Make sure your profile is saved and published.</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
       {/* Add Custom Degree Dialog */}
       <Dialog open={showAddDegreeDialog} onOpenChange={setShowAddDegreeDialog}>
         <DialogContent className="sm:max-w-[425px]">
