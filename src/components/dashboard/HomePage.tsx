@@ -37,6 +37,78 @@ const AD_CLIENT = "ca-pub-2938555455040927"; // Your AdSense publisher ID
 const AD_SLOT = "6643881699";                // Your AdSense ad slot ID
 const AD_INTERVAL = 3;                        // Show an ad card after every N profile cards (1 ad per batch)
 
+// ─── Filter option constants ──────────────────────────────────────────────────
+// Defined at module scope so they can be referenced by the pure utility
+// functions below without re-creating arrays on every render.
+
+const FLAT_TYPE_OPTIONS = [
+  { value: "1rk",   label: "1 RK" },
+  { value: "1bhk",  label: "1 BHK" },
+  { value: "2bhk",  label: "2 BHK" },
+  { value: "3bhk",  label: "3 BHK" },
+  { value: "4bhk",  label: "4 BHK" },
+  { value: "4+bhk", label: "4+ BHK" },
+] as const;
+
+const FURNISHING_OPTIONS = [
+  { value: "non-furnished",   label: "Non Furnished" },
+  { value: "semi-furnished",  label: "Semi-Furnished" },
+  { value: "fully-furnished", label: "Fully Furnished" },
+] as const;
+
+const ROOM_TYPE_OPTIONS = [
+  { value: "private", label: "Private" },
+  { value: "shared",  label: "Shared" },
+  { value: "studio",  label: "Studio" },
+] as const;
+
+// Derive plain string-tuple arrays once; passed to toggleMultiFilter.
+const FLAT_TYPE_VALUES  = FLAT_TYPE_OPTIONS.map(o => o.value);
+const FURNISHING_VALUES = FURNISHING_OPTIONS.map(o => o.value);
+const ROOM_TYPE_VALUES  = ROOM_TYPE_OPTIONS.map(o => o.value);
+
+// ─── Pure utility functions for multi-select filter dropdowns ────────────────
+
+/**
+ * Toggles a value inside a multi-select filter array.
+ *
+ * Behaviour:
+ *   - clicked === "__all__"           → returns [] (all-inclusive, no API filter)
+ *   - clicking an unchecked value     → adds it
+ *   - clicking a checked value        → removes it
+ *   - deselecting the last value      → returns [] (auto-reverts to "All")
+ *   - all specific values selected    → returns [] (treated same as "All")
+ *
+ * The backend already treats [] as "no filter", so this requires zero API changes.
+ */
+function toggleMultiFilter(
+  current: readonly string[],
+  clicked: string,
+  allValues: readonly string[]
+): string[] {
+  if (clicked === "__all__") return [];
+
+  const next = current.includes(clicked)
+    ? current.filter(v => v !== clicked)
+    : [...current, clicked];
+
+  // If every specific option is now selected, treat it as "All" (empty array).
+  return next.length === allValues.length ? [] : next;
+}
+
+/**
+ * Returns the human-readable label for a multi-select trigger button.
+ *
+ * []        → "All"          (no preference = show everything)
+ * [x]       → "1 selected"
+ * [x, y, …] → "{n} selected"
+ */
+function filterLabel(selected: readonly string[]): string {
+  if (selected.length === 0) return "All";
+  if (selected.length === 1) return "1 selected";
+  return `${selected.length} selected`;
+}
+
 // ---- Types for flat details ----
 interface MediaFile {
   id: string;
@@ -589,20 +661,27 @@ export const HomePage = () => {
                         <Popover>
                           <PopoverTrigger asChild>
                             <Button variant="outline" className="w-full justify-between text-left font-normal">
-                              {flatTypes.length > 0 ? `${flatTypes.length} selected` : "Select flat type"}
+                              {filterLabel(flatTypes)}
                               <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-[200px] p-2" align="start">
-                            {[
-                              { value: "1rk", label: "1 RK" },
-                              { value: "1bhk", label: "1 BHK" },
-                              { value: "2bhk", label: "2 BHK" },
-                              { value: "3bhk", label: "3 BHK" },
-                              { value: "4bhk", label: "4 BHK" },
-                              { value: "4+bhk", label: "4+ BHK" },
-                            ].map((type) => (
-                              <div key={type.value} className="flex items-center space-x-2 p-1.5 rounded hover:bg-accent/50 cursor-pointer" onClick={() => setFlatTypes(prev => prev.includes(type.value) ? prev.filter(t => t !== type.value) : [...prev, type.value])}>
+                            {/* ── All Types (default / reset) ── */}
+                            <div
+                              className="flex items-center space-x-2 p-1.5 rounded hover:bg-accent/50 cursor-pointer"
+                              onClick={() => setFlatTypes(toggleMultiFilter(flatTypes, "__all__", FLAT_TYPE_VALUES))}
+                            >
+                              <Checkbox checked={flatTypes.length === 0} />
+                              <Label className="text-sm font-medium cursor-pointer">All Types</Label>
+                            </div>
+                            <div className="h-px bg-border my-1" />
+                            {/* ── Specific options ── */}
+                            {FLAT_TYPE_OPTIONS.map((type) => (
+                              <div
+                                key={type.value}
+                                className="flex items-center space-x-2 p-1.5 rounded hover:bg-accent/50 cursor-pointer"
+                                onClick={() => setFlatTypes(prev => toggleMultiFilter(prev, type.value, FLAT_TYPE_VALUES))}
+                              >
                                 <Checkbox checked={flatTypes.includes(type.value)} />
                                 <Label className="text-sm font-normal cursor-pointer">{type.label}</Label>
                               </div>
@@ -615,17 +694,27 @@ export const HomePage = () => {
                         <Popover>
                           <PopoverTrigger asChild>
                             <Button variant="outline" className="w-full justify-between text-left font-normal">
-                              {furnishingTypes.length > 0 ? `${furnishingTypes.length} selected` : "Select furnishing"}
+                              {filterLabel(furnishingTypes)}
                               <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-[200px] p-2" align="start">
-                            {[
-                              { value: "non-furnished", label: "Non Furnished" },
-                              { value: "semi-furnished", label: "Semi-Furnished" },
-                              { value: "fully-furnished", label: "Fully Furnished" },
-                            ].map((type) => (
-                              <div key={type.value} className="flex items-center space-x-2 p-1.5 rounded hover:bg-accent/50 cursor-pointer" onClick={() => setFurnishingTypes(prev => prev.includes(type.value) ? prev.filter(t => t !== type.value) : [...prev, type.value])}>
+                            {/* ── All Furnishing (default / reset) ── */}
+                            <div
+                              className="flex items-center space-x-2 p-1.5 rounded hover:bg-accent/50 cursor-pointer"
+                              onClick={() => setFurnishingTypes(toggleMultiFilter(furnishingTypes, "__all__", FURNISHING_VALUES))}
+                            >
+                              <Checkbox checked={furnishingTypes.length === 0} />
+                              <Label className="text-sm font-medium cursor-pointer">All Furnishing</Label>
+                            </div>
+                            <div className="h-px bg-border my-1" />
+                            {/* ── Specific options ── */}
+                            {FURNISHING_OPTIONS.map((type) => (
+                              <div
+                                key={type.value}
+                                className="flex items-center space-x-2 p-1.5 rounded hover:bg-accent/50 cursor-pointer"
+                                onClick={() => setFurnishingTypes(prev => toggleMultiFilter(prev, type.value, FURNISHING_VALUES))}
+                              >
                                 <Checkbox checked={furnishingTypes.includes(type.value)} />
                                 <Label className="text-sm font-normal cursor-pointer">{type.label}</Label>
                               </div>
@@ -640,17 +729,27 @@ export const HomePage = () => {
                         <Popover>
                           <PopoverTrigger asChild>
                             <Button variant="outline" className="w-full justify-between text-left font-normal">
-                              {roomTypes.length > 0 ? `${roomTypes.length} selected` : "Select room type"}
+                              {filterLabel(roomTypes)}
                               <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-[200px] p-2" align="start">
-                            {[
-                              { value: "private", label: "Private" },
-                              { value: "shared", label: "Shared" },
-                              { value: "studio", label: "Studio" },
-                            ].map((type) => (
-                              <div key={type.value} className="flex items-center space-x-2 p-1.5 rounded hover:bg-accent/50 cursor-pointer" onClick={() => setRoomTypes(prev => prev.includes(type.value) ? prev.filter(t => t !== type.value) : [...prev, type.value])}>
+                            {/* ── All Room Types (default / reset) ── */}
+                            <div
+                              className="flex items-center space-x-2 p-1.5 rounded hover:bg-accent/50 cursor-pointer"
+                              onClick={() => setRoomTypes(toggleMultiFilter(roomTypes, "__all__", ROOM_TYPE_VALUES))}
+                            >
+                              <Checkbox checked={roomTypes.length === 0} />
+                              <Label className="text-sm font-medium cursor-pointer">All Room Types</Label>
+                            </div>
+                            <div className="h-px bg-border my-1" />
+                            {/* ── Specific options ── */}
+                            {ROOM_TYPE_OPTIONS.map((type) => (
+                              <div
+                                key={type.value}
+                                className="flex items-center space-x-2 p-1.5 rounded hover:bg-accent/50 cursor-pointer"
+                                onClick={() => setRoomTypes(prev => toggleMultiFilter(prev, type.value, ROOM_TYPE_VALUES))}
+                              >
                                 <Checkbox checked={roomTypes.includes(type.value)} />
                                 <Label className="text-sm font-normal cursor-pointer">{type.label}</Label>
                               </div>
@@ -680,31 +779,105 @@ export const HomePage = () => {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Brokerage</Label>
-                        <Select value={brokerage} onValueChange={setBrokerage}>
-                          <SelectTrigger><SelectValue placeholder="Select preference" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="no">No Brokerage</SelectItem>
-                            <SelectItem value="upto15days">Upto 15 Days</SelectItem>
-                            <SelectItem value="upto1month">Upto 1 Month</SelectItem>
-                            <SelectItem value="upto2months">Upto 2 Months</SelectItem>
-                            <SelectItem value="upto3months">Upto 3 Months</SelectItem>
-                            <SelectItem value="morethan3months">More than 3 Months</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full justify-between text-left font-normal">
+                              {brokerage
+                                ? ([
+                                    { value: "no",             label: "No Brokerage" },
+                                    { value: "upto15days",     label: "Upto 15 Days" },
+                                    { value: "upto1month",     label: "Upto 1 Month" },
+                                    { value: "upto2months",    label: "Upto 2 Months" },
+                                    { value: "upto3months",    label: "Upto 3 Months" },
+                                    { value: "morethan3months",label: "More than 3 Months" },
+                                  ].find(o => o.value === brokerage)?.label ?? brokerage)
+                                : "Any"}
+                              <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[200px] p-2" align="start">
+                            {/* Any = deselect / no filter */}
+                            <div
+                              className="flex items-center space-x-2 p-1.5 rounded hover:bg-accent/50 cursor-pointer"
+                              onClick={() => setBrokerage("")}
+                            >
+                              <Checkbox checked={brokerage === ""} />
+                              <Label className="text-sm font-medium cursor-pointer">Any</Label>
+                            </div>
+                            <div className="h-px bg-border my-1" />
+                            {([
+                              { value: "no",              label: "No Brokerage" },
+                              { value: "upto15days",      label: "Upto 15 Days" },
+                              { value: "upto1month",      label: "Upto 1 Month" },
+                              { value: "upto2months",     label: "Upto 2 Months" },
+                              { value: "upto3months",     label: "Upto 3 Months" },
+                              { value: "morethan3months", label: "More than 3 Months" },
+                            ] as const).map((opt) => (
+                              <div
+                                key={opt.value}
+                                className="flex items-center space-x-2 p-1.5 rounded hover:bg-accent/50 cursor-pointer"
+                                onClick={() =>
+                                  // clicking the already-selected option deselects it
+                                  setBrokerage(prev => prev === opt.value ? "" : opt.value)
+                                }
+                              >
+                                <Checkbox checked={brokerage === opt.value} />
+                                <Label className="text-sm font-normal cursor-pointer">{opt.label}</Label>
+                              </div>
+                            ))}
+                          </PopoverContent>
+                        </Popover>
                       </div>
                       <div className="space-y-2">
                         <Label>Security Deposit</Label>
-                        <Select value={securityDeposit} onValueChange={setSecurityDeposit}>
-                          <SelectTrigger><SelectValue placeholder="Select preference" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">No Deposit</SelectItem>
-                            <SelectItem value="upto15days">Upto 15 Days</SelectItem>
-                            <SelectItem value="upto1month">Upto 1 Month</SelectItem>
-                            <SelectItem value="upto2months">Upto 2 Months</SelectItem>
-                            <SelectItem value="upto3months">Upto 3 Months</SelectItem>
-                            <SelectItem value="morethan3months">More than 3 Months</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full justify-between text-left font-normal">
+                              {securityDeposit
+                                ? ([
+                                    { value: "none",           label: "No Deposit" },
+                                    { value: "upto15days",     label: "Upto 15 Days" },
+                                    { value: "upto1month",     label: "Upto 1 Month" },
+                                    { value: "upto2months",    label: "Upto 2 Months" },
+                                    { value: "upto3months",    label: "Upto 3 Months" },
+                                    { value: "morethan3months",label: "More than 3 Months" },
+                                  ].find(o => o.value === securityDeposit)?.label ?? securityDeposit)
+                                : "Any"}
+                              <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[200px] p-2" align="start">
+                            {/* Any = deselect / no filter */}
+                            <div
+                              className="flex items-center space-x-2 p-1.5 rounded hover:bg-accent/50 cursor-pointer"
+                              onClick={() => setSecurityDeposit("")}
+                            >
+                              <Checkbox checked={securityDeposit === ""} />
+                              <Label className="text-sm font-medium cursor-pointer">Any</Label>
+                            </div>
+                            <div className="h-px bg-border my-1" />
+                            {([
+                              { value: "none",            label: "No Deposit" },
+                              { value: "upto15days",      label: "Upto 15 Days" },
+                              { value: "upto1month",      label: "Upto 1 Month" },
+                              { value: "upto2months",     label: "Upto 2 Months" },
+                              { value: "upto3months",     label: "Upto 3 Months" },
+                              { value: "morethan3months", label: "More than 3 Months" },
+                            ] as const).map((opt) => (
+                              <div
+                                key={opt.value}
+                                className="flex items-center space-x-2 p-1.5 rounded hover:bg-accent/50 cursor-pointer"
+                                onClick={() =>
+                                  // clicking the already-selected option deselects it
+                                  setSecurityDeposit(prev => prev === opt.value ? "" : opt.value)
+                                }
+                              >
+                                <Checkbox checked={securityDeposit === opt.value} />
+                                <Label className="text-sm font-normal cursor-pointer">{opt.label}</Label>
+                              </div>
+                            ))}
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     </div>
                     <div className="border rounded-lg overflow-hidden">

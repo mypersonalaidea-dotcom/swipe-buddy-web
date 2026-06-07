@@ -9,7 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ConversationPayload } from "@/lib/types/messaging";
 import { useSocket } from "@/contexts/SocketContext";
 
-type FilterType = "all" | "unread" | "pinned";
+type FilterType = "all" | "unread";
 
 const formatChatTime = (dateStr: string | null | undefined) => {
   if (!dateStr) return "";
@@ -202,7 +202,6 @@ export function ConversationList({
     if (!matchesSearch) return false;
     
     if (activeFilter === "unread") return conv.unread_count > 0;
-    if (activeFilter === "pinned") return conv.muted; // Assuming muted/pinned logic for now
     
     return true;
   });
@@ -240,11 +239,7 @@ export function ConversationList({
               count={unreadTotal}
               onClick={() => setActiveFilter("unread")} 
             />
-            <FilterChip 
-              label="Pinned" 
-              active={activeFilter === "pinned"} 
-              onClick={() => setActiveFilter("pinned")} 
-            />
+
           </div>
           <Button variant="ghost" size="icon" className="rounded-full text-gray-400 hover:text-gray-600 shrink-0">
             <Filter className="h-5 w-5" />

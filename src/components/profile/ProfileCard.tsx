@@ -378,7 +378,7 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
   const getValidPhotos = (photos: string[]) => photos.filter(isValidPhoto);
 
   return (
-    <Card className="relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-lg w-full h-[calc(100vh-112px)] min-h-[580px] flex flex-col">
+    <Card className="relative rounded-2xl bg-white border border-gray-100 shadow-lg w-full h-[calc(100vh-112px)] min-h-[580px] flex flex-col overflow-y-auto overflow-x-hidden md:overflow-hidden">
       {/* ───── Soft pink header background ───── */}
 
       {/* ╔══════════════════════════════════════════════════════════╗
@@ -528,9 +528,9 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
       <div className="h-px bg-gray-100 mx-6" />
 
       {/* ╔══════════════════════════════════════════════════════════╗
-          ║ SCROLLABLE CONTENT                                     ║
+          ║ SCROLLABLE CONTENT (Desktop) / FULL CONTENT (Mobile)     ║
           ╚══════════════════════════════════════════════════════════╝ */}
-      <CardContent className="relative z-10 space-y-5 sm:space-y-7 pt-3 pb-3 px-3 sm:pt-4 sm:pb-4 sm:px-4 md:pt-5 md:pb-5 md:px-5 lg:pt-5 lg:pb-6 lg:px-6 flex-1 overflow-y-auto min-h-0">
+      <CardContent className="relative z-10 space-y-5 sm:space-y-7 pt-3 pb-3 px-3 sm:pt-4 sm:pb-4 sm:px-4 md:pt-5 md:pb-5 md:px-5 lg:pt-5 lg:pb-6 lg:px-6 flex-1 min-h-0 md:overflow-y-auto">
         {/* ──────── FLAT DETAILS ──────── */}
         {profile.flatDetails && (
           <div className="space-y-7">

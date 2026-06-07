@@ -1028,7 +1028,7 @@ export const ProfilePage = () => {
 
       <div className="relative z-10 max-w-4xl mx-auto">
         {/* ── Premium hero banner with wave edge (Restrained Width) ── */}
-        <div className="relative h-[160px] overflow-hidden rounded-b-3xl" style={{ background: 'linear-gradient(135deg, hsl(346 77% 46%) 0%, hsl(346 77% 56%) 40%, hsl(330 72% 58%) 70%, hsl(320 68% 62%) 100%)' }}>
+        <div className="fixed md:relative top-0 left-0 md:left-auto w-full md:w-auto h-[160px] z-0 md:z-auto overflow-hidden rounded-b-3xl" style={{ background: 'linear-gradient(135deg, hsl(346 77% 46%) 0%, hsl(346 77% 56%) 40%, hsl(330 72% 58%) 70%, hsl(320 68% 62%) 100%)' }}>
           {/* Dot pattern */}
           <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '16px 16px' }} />
           {/* Animated orbs inside banner */}
@@ -1055,8 +1055,10 @@ export const ProfilePage = () => {
             <path d="M0,20 C360,45 720,0 1080,25 C1260,37 1380,20 1440,20 L1440,50 L0,50 Z" fill="#fff5f5" />
           </svg>
         </div>
-        {/* ── Profile card — overlaps banner ── */}
-        <div className="relative -mt-16 mx-4 md:mx-8 mb-6 bg-white rounded-2xl border border-gray-200/60 shadow-[0_10px_40px_-10px_hsl(240_10%_15%/0.1)] p-6">
+        {/* Spacer for mobile to push the card down below the fixed banner */}
+        <div className="relative z-10 pt-[160px] md:pt-0">
+          {/* ── Profile card — overlaps banner ── */}
+          <div className="relative -mt-16 mx-4 md:mx-8 mb-6 bg-white rounded-2xl border border-gray-200/60 shadow-[0_10px_40px_-10px_hsl(240_10%_15%/0.1)] p-6">
           <div className="flex flex-col md:flex-row items-center gap-5">
             {/* Avatar — rounded square matching ProfileCard */}
             <div className="relative -mt-16 md:-mt-12 flex-shrink-0">
@@ -1127,16 +1129,10 @@ export const ProfilePage = () => {
               </div>
             )}
 
-            {/* ── EDIT MODE HEADER ── */}
-            {isEditing && (
-              <div className="flex-1 text-center md:text-left">
-                <h2 className="text-2xl font-bold text-gray-900">Edit Profile</h2>
-                <p className="text-sm text-gray-400 mt-0.5">Update your personal details below</p>
-              </div>
-            )}
+
 
             {/* Action buttons */}
-            <div className="flex gap-2 flex-shrink-0">
+            <div className="flex gap-2 flex-shrink-0 md:ml-auto">
 
               <Button variant="outline" onClick={() => setIsShareDialogOpen(true)}
                       className="rounded-xl border-gray-200 text-gray-600 hover:border-rose-300 hover:text-rose-500 transition-colors">
@@ -1164,7 +1160,7 @@ export const ProfilePage = () => {
           {/* ── Editable identity fields: Name → DOB → Gender (stacked) ── */}
           {isEditing && (
             <div className="mt-6 pt-5 border-t border-gray-100">
-              <div className="space-y-4 max-w-xl">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-5 gap-y-4 max-w-3xl">
                 {/* Full Name */}
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1">Full Name <span className="text-red-500">*</span></Label>
@@ -1216,30 +1212,42 @@ export const ProfilePage = () => {
                   </Popover>
                 </div>
                 {/* Gender */}
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 sm:col-span-2 md:col-span-1">
                   <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1">Gender <span className="text-red-500">*</span></Label>
-                  <RadioGroup value={data.gender} onValueChange={(value) => updateField('gender', value)} className="flex gap-3 pt-1">
-                    {[
-                      { value: 'male', label: 'Male', id: 'hero-male' },
-                      { value: 'female', label: 'Female', id: 'hero-female' },
-                      { value: 'other', label: 'Other', id: 'hero-other' },
-                    ].map(({ value, label, id }) => (
-                      <label key={value} htmlFor={id}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border cursor-pointer transition-all text-sm font-medium ${
-                          data.gender === value
-                            ? 'border-rose-300 bg-rose-50/70 text-rose-700 shadow-sm'
-                            : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                        }`}>
-                        <RadioGroupItem value={value} id={id} className="sr-only" />
-                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                          data.gender === value ? 'border-rose-500' : 'border-gray-300'
-                        }`}>
-                          {data.gender === value && <div className="w-2 h-2 rounded-full bg-rose-500" />}
-                        </div>
-                        {label}
-                      </label>
-                    ))}
-                  </RadioGroup>
+                  <Select value={data.gender} onValueChange={(val) => updateField('gender', val)}>
+                    <SelectTrigger className="h-11 rounded-xl border-gray-200 focus:border-rose-300 focus:ring-rose-200/50 w-full">
+                      {/* Custom trigger display — SelectValue stripped colours so we reflect state directly */}
+                      <span className="flex items-center gap-2 text-sm">
+                        {data.gender === 'male'   && <span className="text-blue-500 font-bold text-base leading-none">♂</span>}
+                        {data.gender === 'female' && <span className="text-rose-500 font-bold text-base leading-none">♀</span>}
+                        {data.gender === 'other'  && <span className="text-purple-500 font-bold text-base leading-none">⚧</span>}
+                        {data.gender
+                          ? <span className="text-gray-700 capitalize font-medium">{data.gender}</span>
+                          : <span className="text-muted-foreground font-normal">Select gender</span>
+                        }
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">
+                        <span className="flex items-center gap-2">
+                          <span className="text-blue-500 font-bold text-base leading-none">♂</span>
+                          <span>Male</span>
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="female">
+                        <span className="flex items-center gap-2">
+                          <span className="text-rose-500 font-bold text-base leading-none">♀</span>
+                          <span>Female</span>
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="other">
+                        <span className="flex items-center gap-2">
+                          <span className="text-purple-500 font-bold text-base leading-none">⚧</span>
+                          <span>Other</span>
+                        </span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>
@@ -2418,7 +2426,8 @@ export const ProfilePage = () => {
             </Card>
           </TabsContent>
         </Tabs>
-        </div> {/* Close px-4 content wrapper */}
+          </div> {/* Close Profile Card inner bg-white */}
+        </div> {/* Close spacer for mobile fixed banner */}
       </div> {/* Close max-w-4xl */}
 
       {/* Preview Dialog — shows the saved, published profile exactly as other users see it */}
