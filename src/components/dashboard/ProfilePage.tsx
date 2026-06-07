@@ -1095,16 +1095,9 @@ export const ProfilePage = () => {
                       {format(new Date(data.dob), 'PPP')}
                     </span>
                   ) : (
-                    <TooltipProvider delayDuration={200}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50/40 border border-rose-100/60 text-rose-300 text-[13px] font-medium cursor-default">
-                            <Calendar className="w-3.5 h-3.5" /> –
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Date of Birth is not set</p></TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50/40 border border-rose-100/60 text-rose-300 text-[13px] font-medium">
+                      <Calendar className="w-3.5 h-3.5" /> Not set
+                    </span>
                   )}
                 </div>
                 <div className="flex items-center justify-center md:justify-start gap-2">
@@ -1269,15 +1262,9 @@ export const ProfilePage = () => {
               </div>
               <Button onClick={handleCopyLink} size="sm" className="shrink-0">
                 {isCopied ? (
-                  <>
-                    <Check className="w-4 h-4 mr-2" />
-                    Copied
-                  </>
+                  <span className="flex items-center gap-1.5"><Check className="w-4 h-4 mr-2" />Copied</span>
                 ) : (
-                  <>
-                    <Copy className="w-4 h-4 mr-2" />
-                    Copy
-                  </>
+                  <span className="flex items-center gap-1.5"><Copy className="w-4 h-4 mr-2" />Copy</span>
                 )}
               </Button>
             </div>
@@ -1769,30 +1756,17 @@ export const ProfilePage = () => {
                       <MapPin className="w-4 h-4" />
                       Preferred Search Area
                     </Label>
-                    <p className="text-sm text-muted-foreground">
-                      {isEditing ? 'Select the area where you\'re looking for a flat and adjust the search radius' : 'Selected area for search'}
-                    </p>
                     {isEditing ? (
                       <MapPicker
-                        showRadius
-                        radius={data.searchRadius ?? 5}
                         location={data.searchLocation}
                         coordinates={data.searchCoordinates}
-                        onLocationChange={(result) => {
-                          setEditedProfile({
-                            ...editedProfile,
-                            searchLocation: result.fullAddress,
-                            searchCoordinates: result.coordinates,
-                          });
-                        }}
-                        onRadiusChange={(r) => {
-                          updateField('searchRadius', r);
-                        }}
+                        radius={data.searchRadius}
+                        showRadius
                         height="280px"
                       />
                     ) : (
                       <div className="space-y-2">
-                         <p className="text-[15px] font-semibold text-gray-900">
+                        <p className="text-[15px] font-semibold text-gray-900">
                           {data.searchLocation || 'No location selected'} (Radius: {data.searchRadius}km)
                         </p>
                         {data.searchCoordinates && (
