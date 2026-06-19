@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Check, ChevronsUpDown } from "lucide-react"
+import { Check, ChevronsUpDown, Plus } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -37,6 +37,19 @@ export function SearchableSelect({
     alwaysShowOther = false,
 }: SearchableSelectProps) {
     const [open, setOpen] = React.useState(false)
+    const [searchQuery, setSearchQuery] = React.useState("")
+
+    const sortedOptions = React.useMemo(() => {
+        const hasOther = options.includes("Other");
+        const listToSort = options.filter(opt => opt !== "Other");
+        const sorted = [...listToSort].sort((a, b) =>
+            a.localeCompare(b, undefined, { sensitivity: 'base' })
+        );
+        if (hasOther && !alwaysShowOther) {
+            sorted.push("Other");
+        }
+        return sorted;
+    }, [options, alwaysShowOther]);
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
@@ -53,11 +66,28 @@ export function SearchableSelect({
             </PopoverTrigger>
             <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                 <Command>
-                    <CommandInput placeholder={searchPlaceholder} />
-                    <CommandList className="max-h-[300px]">
+                    <CommandInput 
+                        placeholder={searchPlaceholder} 
+                        value={searchQuery}
+                        onValueChange={setSearchQuery}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter" && searchQuery.trim() && alwaysShowOther) {
+                                const hasMatch = options.some(opt => 
+                                    opt.toLowerCase() === searchQuery.trim().toLowerCase()
+                                );
+                                if (!hasMatch) {
+                                    e.preventDefault();
+                                    onValueChange("Other");
+                                    setOpen(false);
+                                }
+                            }
+                        }}
+                    />
+                    <div className="max-h-[260px] overflow-y-auto">
+                    <CommandList>
                         <CommandEmpty>{emptyText}</CommandEmpty>
                         <CommandGroup>
-                            {options.filter(opt => !alwaysShowOther || opt !== "Other").map((option) => (
+                            {sortedOptions.filter(opt => !alwaysShowOther || opt !== "Other").map((option) => (
                                 <CommandItem
                                     key={option}
                                     value={option}
@@ -77,29 +107,26 @@ export function SearchableSelect({
                                 </CommandItem>
                             ))}
                         </CommandGroup>
-                        {alwaysShowOther && (
-                            <CommandGroup forceMount className="border-t border-border/60">
-                                <CommandItem
-                                    value="__force_other_rendering__"
-                                    onSelect={() => {
-                                        onValueChange(value === "Other" ? "" : "Other")
-                                        setOpen(false)
-                                    }}
-                                    forceMount
-                                    className="cursor-pointer"
-                                >
-                                    <Check
-                                        className={cn(
-                                            "mr-2 h-4 w-4 text-primary",
-                                            value === "Other" ? "opacity-100" : "opacity-0"
-                                        )}
-                                    />
-                                    <span className="font-semibold text-primary">Other</span>
-                                    <span className="ml-1.5 text-xs text-primary/60">(Add new degree)</span>
-                                </CommandItem>
-                            </CommandGroup>
-                        )}
                     </CommandList>
+                    </div>
+                    {alwaysShowOther && (
+                        <div className="p-1.5 bg-background border-t border-border/50 flex justify-center">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onValueChange(value === "Other" ? "" : "Other")
+                                    setOpen(false)
+                                }}
+                                className="w-full text-left px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground font-normal flex items-center justify-between transition-colors cursor-pointer"
+                            >
+                                <span className="flex items-center">
+                                    <span className="font-semibold text-primary">Other</span>
+                                    <span className="ml-1.5 text-xs text-primary/60">(Add in list)</span>
+                                </span>
+                                <Plus className="w-4 h-4 text-primary opacity-60" />
+                            </button>
+                        </div>
+                    )}
                 </Command>
             </PopoverContent>
         </Popover>

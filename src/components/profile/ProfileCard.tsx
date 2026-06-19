@@ -147,25 +147,29 @@ const flatTypeLabels: Record<string, string> = {
 const isValidPhoto = (url: string | undefined | null): url is string =>
   !!url && url.length > 0 && url !== "";
 
-const OrganizationLogoPill = ({ icon: Icon, name, type, text }: { icon: any, name?: string, type: 'job' | 'education', text: React.ReactNode }) => {
+const OrganizationLogoPill = ({ icon: Icon, name, type, text, logoUrl }: { icon: any, name?: string, type: 'job' | 'education', text: React.ReactNode, logoUrl?: string }) => {
   const [imgState, setImgState] = useState<'loading'|'loaded'|'error'>('loading');
   const domain = name ? name.toLowerCase().replace(/[^a-z0-9]/g, '') + (type === 'education' ? '.edu' : '.com') : '';
-  const url = `https://logo.clearbit.com/${domain}`;
+  const url = logoUrl || (domain ? `https://logo.clearbit.com/${domain}` : '');
+
+  useEffect(() => {
+    setImgState('loading');
+  }, [url]);
   
   return (
     <span className="inline-flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg border border-gray-100 bg-white text-[#71738B] font-medium shadow-sm">
-      <div className="relative w-[14px] h-[14px] flex-shrink-0 flex items-center justify-center">
-        {name && imgState !== 'error' && (
+      <div className="relative w-[18px] h-[18px] flex-shrink-0 flex items-center justify-center">
+        {url && imgState !== 'error' && (
           <img 
               src={url} 
-              alt={name}
+              alt={name || ''}
               className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-200 ${imgState === 'loaded' ? 'opacity-100' : 'opacity-0'}`}
               onLoad={() => setImgState('loaded')}
               onError={() => setImgState('error')}
           />
         )}
-        {(imgState !== 'loaded' || !name) && (
-          <Icon className="w-[14px] h-[14px] text-[#A0A2B8] stroke-[2]" />
+        {(imgState !== 'loaded' || !url) && (
+          <Icon className="w-[18px] h-[18px] text-[#A0A2B8] stroke-[2]" />
         )}
       </div>
       {text}
@@ -446,14 +450,16 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                   const isString = typeof job === 'string';
                   const jobText = isString ? job : `${job.position} at ${job.company}`;
                   const jobName = isString ? job.split(' at ')[1] || job : job.company;
-                  return <OrganizationLogoPill type="job" icon={Briefcase} name={jobName} text={jobText} />;
+                  const logoUrl = isString ? undefined : job.companyLogo;
+                  return <OrganizationLogoPill type="job" icon={Briefcase} name={jobName} text={jobText} logoUrl={logoUrl} />;
                 })()}
                 {(profile.educationExperiences?.length ?? 0) > 0 && (() => {
                   const edu = profile.educationExperiences![0];
                   const isString = typeof edu === 'string';
                   const eduText = isString ? edu : `${edu.degree || 'Degree'} from ${edu.institution}`;
                   const eduName = isString ? edu.split(' from ')[1] || edu : edu.institution;
-                  return <OrganizationLogoPill type="education" icon={GraduationCap} name={eduName} text={eduText} />;
+                  const logoUrl = isString ? undefined : edu.institutionLogo;
+                  return <OrganizationLogoPill type="education" icon={GraduationCap} name={eduName} text={eduText} logoUrl={logoUrl} />;
                 })()}
               </div>
             </div>

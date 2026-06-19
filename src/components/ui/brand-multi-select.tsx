@@ -39,6 +39,8 @@ interface BrandMultiSelectProps {
     onSelectedValuesChange: (values: string[]) => void;
     onAddNewBrand: (brand: Omit<BrandOption, "id"> & { logoFile?: File }) => void;
     mode?: "single" | "multiple";
+    namePlaceholder?: string;
+    aliasesPlaceholder?: string;
 }
 
 export function BrandMultiSelect({
@@ -51,11 +53,19 @@ export function BrandMultiSelect({
     onSelectedValuesChange,
     onAddNewBrand,
     mode = "multiple",
+    namePlaceholder = "Google",
+    aliasesPlaceholder = "Ex: Google India, Alphabet",
 }: BrandMultiSelectProps) {
     const [open, setOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const { toast } = useToast();
+
+    const sortedOptions = React.useMemo(() => {
+        return [...options].sort((a, b) =>
+            a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+        );
+    }, [options]);
 
     // Add form state
     const [addName, setAddName] = useState("");
@@ -227,22 +237,26 @@ export function BrandMultiSelect({
                             placeholder={placeholder}
                             value={searchQuery}
                             onValueChange={setSearchQuery}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" && searchQuery.trim()) {
+                                    const hasMatch = options.some(opt => 
+                                        opt.name.toLowerCase() === searchQuery.trim().toLowerCase() ||
+                                        (opt.aliases && opt.aliases.some(alias => alias.toLowerCase() === searchQuery.trim().toLowerCase()))
+                                    );
+                                    if (!hasMatch) {
+                                        e.preventDefault();
+                                        openAddModal(searchQuery);
+                                    }
+                                }
+                            }}
                         />
+                        <div className="max-h-[260px] overflow-y-auto">
                         <CommandList>
-                            <CommandEmpty className="p-4 text-center space-y-3">
+                            <CommandEmpty className="p-4 text-center">
                                 <p className="text-sm text-muted-foreground">No matching results found.</p>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="w-full gap-2"
-                                    onClick={() => openAddModal(searchQuery)}
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    Add "{searchQuery}" to DB
-                                </Button>
                             </CommandEmpty>
                             <CommandGroup>
-                                {options.map((option) => (
+                                {sortedOptions.map((option) => (
                                     <CommandItem
                                         key={option.id}
                                         value={[option.name, ...(option.aliases || [])].join(" ")}
@@ -268,6 +282,20 @@ export function BrandMultiSelect({
                                 ))}
                             </CommandGroup>
                         </CommandList>
+                        </div>
+                        <div className="p-1.5 bg-background border-t border-border/50 flex justify-center">
+                            <button
+                                type="button"
+                                onClick={() => openAddModal(searchQuery)}
+                                className="w-full text-left px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground font-normal flex items-center justify-between transition-colors cursor-pointer"
+                            >
+                                <span className="flex items-center">
+                                    <span className="font-semibold text-primary">Other</span>
+                                    <span className="ml-1.5 text-xs text-primary/60">(Add in list)</span>
+                                </span>
+                                <Plus className="w-4 h-4 text-primary opacity-60" />
+                            </button>
+                        </div>
                     </Command>
                 </PopoverContent>
             </Popover>
@@ -305,7 +333,7 @@ export function BrandMultiSelect({
                                     setAddName(e.target.value);
                                     if (nameError) setNameError("");
                                 }}
-                                placeholder="Google"
+                                placeholder={namePlaceholder}
                                 maxLength={50}
                             />
                             {nameError && <p className="text-xs text-destructive">{nameError}</p>}
@@ -322,7 +350,7 @@ export function BrandMultiSelect({
                                 id="add-aliases"
                                 value={addAliases}
                                 onChange={(e) => setAddAliases(e.target.value)}
-                                placeholder="Ex: Google India, Alphabet"
+                                placeholder={aliasesPlaceholder}
                                 maxLength={250}
                             />
                             <div className="flex justify-between">

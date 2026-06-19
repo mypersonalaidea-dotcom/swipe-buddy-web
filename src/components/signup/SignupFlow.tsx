@@ -59,6 +59,7 @@ interface SignupData {
     emailVerified: boolean;
     jobExperiences: JobExperience[];
     educationExperiences: EducationExperience[];
+    whatsappNotifications: boolean;
   };
   housingDetails: {
     searchType: "flat" | "flatmate" | "both";
@@ -106,6 +107,7 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
       profilePicture: null,
       phoneVerified: false,
       emailVerified: false,
+      whatsappNotifications: true,
       jobExperiences: [],
       educationExperiences: []
     },
@@ -291,6 +293,7 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
         state: flatDetails.state || undefined,
         profile_picture_url: profilePictureUrl,
         flat_details,
+        whatsapp_notifications: personalInfo.whatsappNotifications,
       });
 
       // ── Step 3: Other Profile Updates (Jobs, Education, Prefs) ───────
@@ -298,6 +301,7 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
       await api.put("/profile", {
         phone_verified: personalInfo.phoneVerified,
         email_verified: personalInfo.emailVerified,
+        whatsapp_notifications: personalInfo.whatsappNotifications,
       });
 
       // Add jobs

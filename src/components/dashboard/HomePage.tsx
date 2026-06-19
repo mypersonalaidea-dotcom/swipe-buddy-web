@@ -148,6 +148,7 @@ export const HomePage = () => {
   const [currentIndex, setCurrentIndex] = useState(1);
   const [isAnimating, setIsAnimating] = useState(false);
   const [animationDirection, setAnimationDirection] = useState<"left" | "right" | null>(null);
+  const [entryDirection, setEntryDirection] = useState<"left" | "right">("right");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { toast } = useToast();
   const { mutate: updateSearchPreferences } = useUpdateSearchPreferences();
@@ -274,6 +275,73 @@ export const HomePage = () => {
     items.push({ type: "ad", key: `ad-batch-end` });
     return items;
   }, [profiles]);
+
+  // Preload URLs of the next 3 profile cards (profile picture + company logo + school logo) in the background
+  const preloadedUrls = useMemo(() => {
+    const urls: string[] = [];
+    let profilesFound = 0;
+    const maxProfilesToPreload = 3; // Preload next 3 profiles (Ads to Ads interval)
+    
+    for (let i = 1; i < 10; i++) {
+      if (profilesFound >= maxProfilesToPreload) break;
+      
+      const nextItem = swipeItems[currentIndex + i];
+      if (!nextItem) break;
+      
+      if (nextItem.type === "profile") {
+        profilesFound++;
+        const profileData = nextItem.data;
+        
+        // A. Extract Main Profile Picture
+        if (profileData.profilePicture) {
+          urls.push(profileData.profilePicture);
+        }
+        
+        // B. Extract Job Experience Logo / Fallback URL
+        if (profileData.jobExperiences && profileData.jobExperiences.length > 0) {
+          const job = profileData.jobExperiences[0];
+          if (typeof job !== 'string') {
+            if (job.companyLogo) {
+              urls.push(job.companyLogo);
+            } else if (job.company) {
+              const domain = job.company.toLowerCase().replace(/[^a-z0-9]/g, '');
+              if (domain) urls.push(`https://logo.clearbit.com/${domain}.com`);
+            }
+          } else {
+            const company = job.split(' at ')[1] || job;
+            const domain = company.toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (domain) urls.push(`https://logo.clearbit.com/${domain}.com`);
+          }
+        }
+
+        // C. Extract Education Experience Logo / Fallback URL
+        if (profileData.educationExperiences && profileData.educationExperiences.length > 0) {
+          const edu = profileData.educationExperiences[0];
+          if (typeof edu !== 'string') {
+            if (edu.institutionLogo) {
+              urls.push(edu.institutionLogo);
+            } else if (edu.institution) {
+              const domain = edu.institution.toLowerCase().replace(/[^a-z0-9]/g, '');
+              if (domain) urls.push(`https://logo.clearbit.com/${domain}.edu`);
+            }
+          } else {
+            const institution = edu.split(' from ')[1] || edu;
+            const domain = institution.toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (domain) urls.push(`https://logo.clearbit.com/${domain}.edu`);
+          }
+        }
+      }
+    }
+    return urls;
+  }, [currentIndex, swipeItems]);
+
+  // Warm browser cache programmatically to avoid CSS display:none loading optimizer
+  useEffect(() => {
+    preloadedUrls.forEach((url) => {
+      const img = new Image();
+      img.src = url;
+    });
+  }, [preloadedUrls]);
 
   // ---- Mark cards as visited & load next batch ----
   const markCurrentBatchVisited = useCallback(() => {
@@ -549,6 +617,7 @@ export const HomePage = () => {
 
     setIsAnimating(true);
     setAnimationDirection("left");
+    setEntryDirection("right");
     setTimeout(() => {
       const nextIndex = currentIndex + 1;
       setCurrentIndex(nextIndex);
@@ -566,6 +635,7 @@ export const HomePage = () => {
     if (isAnimating || currentIndex <= 0) return;
     setIsAnimating(true);
     setAnimationDirection("right");
+    setEntryDirection("left");
     setTimeout(() => { setCurrentIndex(prev => prev - 1); setIsAnimating(false); setAnimationDirection(null); }, 300);
   };
 
@@ -1472,7 +1542,7 @@ export const HomePage = () => {
               </Button>
             </div>
           ) : swipeItems[currentIndex] ? (
-            <div className={animationDirection === "left" ? "animate-swipe-out-left w-full" : animationDirection === "right" ? "animate-swipe-out-right w-full" : "animate-slide-in w-full"}>
+            <div className={animationDirection === "left" ? "animate-swipe-out-left w-full" : animationDirection === "right" ? "animate-swipe-out-right w-full" : entryDirection === "left" ? "animate-slide-in-left w-full" : "animate-slide-in-right w-full"}>
               {swipeItems[currentIndex].type === "profile" ? (
                 <ProfileCard 
                   profile={(swipeItems[currentIndex] as any).data} 

@@ -1484,6 +1484,7 @@ export const ProfilePage = () => {
                         <div className="grid grid-cols-2 gap-3">
                           <BrandMultiSelect
                             label={<>Company <span className="text-red-500">*</span></>}
+                            dialogLabel="Company"
                             placeholder="Select Company..."
                             options={companiesDb}
                             selectedValues={exp.company ? [exp.company] : []}
@@ -1603,6 +1604,9 @@ export const ProfilePage = () => {
                           <div className="grid grid-cols-2 gap-3">
                             <BrandMultiSelect
                               label={<>Institution <span className="text-red-500">*</span></>}
+                              dialogLabel="Institution"
+                              namePlaceholder="Institution Full Name"
+                              aliasesPlaceholder="Ex: abc, xyz"
                               placeholder="Select Institution..."
                               options={schoolsDb}
                               selectedValues={edu.institution ? [edu.institution] : []}

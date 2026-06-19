@@ -60,6 +60,7 @@ interface PersonalInfoData {
   emailVerified: boolean;
   jobExperiences: JobExperience[];
   educationExperiences: EducationExperience[];
+  whatsappNotifications: boolean;
 }
 
 interface PersonalInfoStepProps {
@@ -987,6 +988,7 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
                 handleInputChange('phone', value);
                 if (data.phoneVerified && value !== data.phone) {
                   handleInputChange('phoneVerified', false);
+                  handleInputChange('whatsappNotifications', true);
                 }
               }}
               maxLength={10}
@@ -1003,6 +1005,23 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
           </div>
           {data.phoneVerified && (
             <p className="text-sm text-green-600">Phone number verified successfully!</p>
+          )}
+          {data.phoneVerified && (
+            <div className="flex items-center gap-3 px-0.5 animate-fade-in">
+              <Checkbox
+                id="whatsappNotifications"
+                checked={data.whatsappNotifications}
+                onCheckedChange={(checked) => handleInputChange('whatsappNotifications', !!checked)}
+                className="shrink-0 border-gray-300 data-[state=checked]:bg-[#25D366] data-[state=checked]:border-[#25D366]"
+              />
+              <Label
+                htmlFor="whatsappNotifications"
+                className="text-sm text-muted-foreground font-normal cursor-pointer select-none leading-snug"
+              >
+                Get notifications &amp; updates on{" "}
+                <span className="text-[#25D366] font-medium">WhatsApp</span>
+              </Label>
+            </div>
           )}
         </div>
 
@@ -1373,6 +1392,9 @@ export const PersonalInfoStep = ({ data, onUpdate, onNext, onSwitchToLogin }: Pe
                     <div className="space-y-2">
                       <BrandMultiSelect
                         label={<>Institution <span className="text-red-500">*</span></>}
+                        dialogLabel="Institution"
+                        namePlaceholder="Institution Full Name"
+                        aliasesPlaceholder="Ex: abc, xyz"
                         icon={<BookOpen className="w-4 h-4" />}
                         placeholder="Search schools..."
                         options={schoolsDb}
