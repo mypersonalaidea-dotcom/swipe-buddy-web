@@ -10,7 +10,8 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { useFlats } from "@/hooks/useFlats";
-import { useUpdateSearchPreferences } from "@/hooks/useProfile";
+import { useUpdateSearchPreferences, useMyProfile, useUpdateProfile, useMyHabits, useUpdateHabits } from "@/hooks/useProfile";
+import { useCompanies, useInstitutions, useHabits } from "@/hooks/useMasterData";
 import { useSavedProfiles } from "@/hooks/useSocial";
 import { useDiscoverFeed, useMarkVisited, useClearVisited, type DiscoverCard } from "@/hooks/useDiscover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -18,7 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
-import { CalendarIcon, Plus, Trash2, DoorOpen, Camera, Save, X } from "lucide-react";
+import { CalendarIcon, Plus, Trash2, DoorOpen, Camera, Save, X, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -152,6 +153,16 @@ export const HomePage = () => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { toast } = useToast();
   const { mutate: updateSearchPreferences } = useUpdateSearchPreferences();
+  const { data: myProfile } = useMyProfile();
+  const { mutate: updateProfileMutation, isPending: isUpdatingProfile } = useUpdateProfile();
+  const { data: apiHabits = [] } = useMyHabits();
+  const { mutateAsync: updateHabits } = useUpdateHabits();
+  const { data: masterHabitsData = [] } = useHabits();
+  const { data: masterCompanies = [] } = useCompanies();
+  const { data: masterInstitutions = [] } = useInstitutions();
+
+  const hasCompany = myProfile?.job_experiences && myProfile.job_experiences.some(j => j.company || j.company_name);
+  const hasSchool = myProfile?.education_experiences && myProfile.education_experiences.some(e => e.institution || e.institution_name);
 
   const [appliedFilters, setAppliedFilters] = useState<Record<string, any>>({});
   
@@ -455,15 +466,31 @@ export const HomePage = () => {
   const [flatmateProfileHabits, setFlatmateProfileHabits] = useState<string[]>([]);
   const [flatmateCompanies, setFlatmateCompanies] = useState<string[]>([]);
   const [flatmateSchools, setFlatmateSchools] = useState<string[]>([]);
-  const [companiesDb, setCompaniesDb] = useState<BrandOption[]>([
-    { id: "c1", name: "Google", aliases: ["Alphabet"], logo: "https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" },
+  const [extraCompanies, setExtraCompanies] = useState<BrandOption[]>([]);
+  const [extraSchools, setExtraSchools] = useState<BrandOption[]>([]);
+
+  const companiesDb: BrandOption[] = [
+    { id: "c1", name: "Google", aliases: ["Alphabet", "Google India"], logo: "https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" },
     { id: "c2", name: "TCS", aliases: ["Tata Consultancy Services"], logo: "https://upload.wikimedia.org/wikipedia/commons/b/b1/Tata_Consultancy_Services_Logo.svg" },
     { id: "c3", name: "Microsoft", logo: "https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg" },
-  ]);
-  const [schoolsDb, setSchoolsDb] = useState<BrandOption[]>([
+    ...masterCompanies.map(c => ({ id: c.id, name: c.name, logo: c.logo_url ?? undefined })),
+    ...extraCompanies,
+  ].filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+
+  const schoolsDb: BrandOption[] = [
     { id: "s1", name: "IIT Delhi", aliases: ["Indian Institute of Technology Delhi"], logo: "https://upload.wikimedia.org/wikipedia/en/1/1d/Indian_Institute_of_Technology_Delhi_Logo.svg" },
     { id: "s2", name: "NIT Trichy", aliases: ["National Institute of Technology"], logo: "https://upload.wikimedia.org/wikipedia/en/c/c4/National_Institute_of_Technology%2C_Tiruchirappalli_Logo.png" },
-  ]);
+    ...masterInstitutions.map(i => ({ id: i.id, name: i.name, logo: i.logo_url ?? undefined })),
+    ...extraSchools,
+  ].filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+
+  const setCompaniesDb = (updater: (prev: BrandOption[]) => BrandOption[]) => {
+    setExtraCompanies(prev => updater([...companiesDb]).filter(i => !companiesDb.find(m => m.id === i.id)));
+  };
+
+  const setSchoolsDb = (updater: (prev: BrandOption[]) => BrandOption[]) => {
+    setExtraSchools(prev => updater([...schoolsDb]).filter(i => !schoolsDb.find(m => m.id === i.id)));
+  };
   const handleFlatmateProfileHabitToggle = (habit: string) => {
     setFlatmateProfileHabits(prev => prev.includes(habit) ? prev.filter(h => h !== habit) : [...prev, habit]);
   };
@@ -474,8 +501,15 @@ export const HomePage = () => {
     else setFlatmateProfileExpanded(false);
   };
 
-  // --- User profile habits (source of truth) ---
+  // --- User profile habits (source of truth synced with API) ---
   const [userProfileHabits, setUserProfileHabits] = useState<string[]>([]);
+
+  // Sync from API on first load
+  useEffect(() => {
+    if (apiHabits.length > 0) {
+      setUserProfileHabits(apiHabits.map(h => h.habit.label));
+    }
+  }, [apiHabits]);
   const [flatHabitsExpanded, setFlatHabitsExpanded] = useState(false);
   const [flatmateHabitsExpanded, setFlatmateHabitsExpanded] = useState(false);
   const [habitsPopupOpen, setHabitsPopupOpen] = useState(false);
@@ -500,13 +534,34 @@ export const HomePage = () => {
     }
   };
 
-  const savePopupHabits = () => {
-    setUserProfileHabits(popupHabits);
-    setHabitsPopupOpen(false);
-    toast({
-      title: "Habits Updated",
-      description: "Your habits have been saved to your profile.",
-    });
+  const savePopupHabits = async () => {
+    // Map labels back to IDs using both current habits and master habits
+    const habitIds = popupHabits.map(label => {
+      // Check existing user habits first
+      const existing = apiHabits.find(h => h.habit.label === label);
+      if (existing) return existing.habit.id;
+      // Fallback: check master habits data
+      const master = masterHabitsData.find(h => h.label === label);
+      return master?.id;
+    }).filter(Boolean) as string[];
+
+    try {
+      if (habitIds.length > 0) {
+        await updateHabits(habitIds);
+      }
+      setUserProfileHabits(popupHabits);
+      setHabitsPopupOpen(false);
+      toast({
+        title: "Habits Saved!",
+        description: "Your habits have been updated on your profile.",
+      });
+    } catch (err: any) {
+      toast({
+        title: "Save Failed",
+        description: err?.response?.data?.message || "Could not save habits.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleRoomAmenityToggle = (amenity: string) => {
@@ -692,7 +747,7 @@ export const HomePage = () => {
                     />
                     <Label htmlFor="filter-flat" className="font-medium text-base cursor-pointer flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                       <Home className="w-4 h-4" />
-                      Looking for Flat
+                      Flat
                     </Label>
                   </div>
                   {flatFilterEnabled && (
@@ -720,6 +775,23 @@ export const HomePage = () => {
                           height="160px"
                         />
                       </div>
+                      {locationSearch && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full gap-2 text-xs border-primary/40 text-primary hover:bg-primary/10"
+                          disabled={isUpdatingProfile}
+                          onClick={() => {
+                            updateProfileMutation({ city: locationSearch } as any, {
+                              onSuccess: () => toast({ title: "Profile Updated", description: "Your search location has been saved to your profile." }),
+                              onError: () => toast({ title: "Update Failed", description: "Could not update profile location.", variant: "destructive" }),
+                            });
+                          }}
+                        >
+                          <MapPin className="w-3.5 h-3.5" />
+                          {isUpdatingProfile ? "Updating..." : "Update Location on Profile"}
+                        </Button>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label>Search Range: {locationRange[0]} km</Label>
@@ -1029,7 +1101,7 @@ export const HomePage = () => {
                     />
                     <Label htmlFor="filter-flatmate" className="font-medium text-base cursor-pointer flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                       <Users className="w-4 h-4" />
-                      Looking for Flatmate
+                      Flatmate
                     </Label>
                   </div>
                   {flatmateFilterEnabled && (
@@ -1323,6 +1395,8 @@ export const HomePage = () => {
                         options={companiesDb}
                         selectedValues={flatmateCompanies}
                         onSelectedValuesChange={setFlatmateCompanies}
+                        disabled={!hasCompany}
+                        disabledMessage="You must add a company to your profile to filter by company."
                         onAddNewBrand={(brand) => {
                           const newBrand = { ...brand, id: `c-new-${Date.now()}` };
                           setCompaniesDb((prev) => [...prev, newBrand]);
@@ -1336,6 +1410,8 @@ export const HomePage = () => {
                         options={schoolsDb}
                         selectedValues={flatmateSchools}
                         onSelectedValuesChange={setFlatmateSchools}
+                        disabled={!hasSchool}
+                        disabledMessage="You must add an institution to your profile to filter by school."
                         onAddNewBrand={(brand) => {
                           const newBrand = { ...brand, id: `s-new-${Date.now()}` };
                           setSchoolsDb((prev) => [...prev, newBrand]);
@@ -1512,9 +1588,55 @@ export const HomePage = () => {
 
         <div className="flex-1 h-full flex items-start justify-center pt-14 pb-14 px-2">
           {(discoverLoading || isMarkingVisited) ? (
-            <div className="flex flex-col items-center gap-3 text-muted-foreground">
-              <Loader2 className="w-8 h-8 animate-spin" />
-              <p className="text-sm">{isMarkingVisited ? "Loading next batch..." : "Finding matches..."}</p>
+            <div className="flex flex-col items-center gap-4 text-muted-foreground w-full max-w-sm">
+              {/* Animated skeleton card */}
+              <div className="relative w-full rounded-2xl overflow-hidden border border-border/50 shadow-xl bg-card" style={{ height: 480 }}>
+                {/* Shimmer overlay */}
+                <div
+                  className="absolute inset-0 z-10"
+                  style={{
+                    background: 'linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.07) 50%, transparent 60%)',
+                    backgroundSize: '200% 100%',
+                    animation: 'shimmer 1.5s infinite',
+                  }}
+                />
+                {/* Fake image area */}
+                <div className="w-full h-64 bg-gradient-to-br from-muted/60 to-muted/30 animate-pulse" />
+                {/* Fake content */}
+                <div className="p-4 space-y-3">
+                  <div className="h-5 bg-muted/60 rounded-full w-2/3 animate-pulse" />
+                  <div className="h-4 bg-muted/40 rounded-full w-1/2 animate-pulse" />
+                  <div className="flex gap-2 mt-3">
+                    {[1,2,3].map(i => (
+                      <div key={i} className="h-7 bg-muted/40 rounded-full animate-pulse" style={{ width: 70, animationDelay: `${i * 0.15}s` }} />
+                    ))}
+                  </div>
+                  <div className="h-4 bg-muted/30 rounded-full w-full animate-pulse" style={{ animationDelay: '0.3s' }} />
+                  <div className="h-4 bg-muted/30 rounded-full w-4/5 animate-pulse" style={{ animationDelay: '0.45s' }} />
+                </div>
+                {/* Floating hearts */}
+                {[...Array(3)].map((_, i) => (
+                  <span
+                    key={i}
+                    className="absolute text-rose-400/60 text-xl select-none pointer-events-none"
+                    style={{
+                      left: `${25 + i * 25}%`,
+                      bottom: '60px',
+                      animation: `floatUp 2s ease-in infinite`,
+                      animationDelay: `${i * 0.7}s`,
+                    }}
+                  >
+                    ♥
+                  </span>
+                ))}
+              </div>
+              <p className="text-sm font-medium text-muted-foreground animate-pulse">
+                {isMarkingVisited ? "Loading next batch..." : "Finding your perfect match..."}
+              </p>
+              <style>{`
+                @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+                @keyframes floatUp { 0% { opacity: 0.7; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-80px) scale(1.4); } }
+              `}</style>
             </div>
           ) : feedExhausted ? (
             /* ---- Feed exhausted: Show reset button ---- */

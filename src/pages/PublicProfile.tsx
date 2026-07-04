@@ -135,8 +135,10 @@ const PublicProfile = () => {
                         </div>
                         
                         <div className="flex flex-wrap gap-1.5">
-                          {flat.common_amenities?.slice(0, 3).map(a => (
-                            <Badge key={a} variant="outline" className="text-[10px] font-medium px-2 py-0">{a}</Badge>
+                          {flat.common_amenities?.slice(0, 3).map((a: any) => (
+                            <Badge key={a.name || a} variant="outline" className="text-[10px] font-medium px-2 py-0">
+                              {a.icon_name ? `${a.icon_name} ` : ""}{a.name || a}
+                            </Badge>
                           ))}
                           {(flat.common_amenities?.length || 0) > 3 && (
                             <Badge variant="outline" className="text-[10px] font-medium px-2 py-0">+{flat.common_amenities!.length - 3}</Badge>

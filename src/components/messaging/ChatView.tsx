@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ArrowLeft, MoreVertical, Flag, User as UserIcon, ShieldOff, Trash2 } from "lucide-react";
+import { ArrowLeft, MoreVertical, Flag, User as UserIcon, ShieldOff, Trash2, MessageCircle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -63,16 +63,33 @@ export function ChatView({ conversation, onBack, onViewProfile }: ChatViewProps)
 
   if (!conversation) {
     return (
-      <div className="hidden md:flex flex-1 items-center justify-center bg-gradient-to-b from-muted/10 to-muted/5">
-        <div className="text-center space-y-4">
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mx-auto shadow-inner">
-            <UserIcon className="h-9 w-9 text-primary/60" />
+      <div className="hidden md:flex flex-1 items-center justify-center bg-gradient-to-br from-rose-50/50 via-white to-pink-50/50 relative overflow-hidden">
+        {/* Background Decorative Elements */}
+        <div className="absolute top-20 left-20 w-72 h-72 bg-rose-200/20 rounded-full blur-3xl" />
+        <div className="absolute bottom-20 right-20 w-96 h-96 bg-pink-200/20 rounded-full blur-3xl" />
+        
+        <div className="text-center space-y-6 relative z-10 animate-fade-in max-w-md px-6">
+          <div className="relative inline-block">
+            <div className="absolute -inset-2 bg-gradient-to-r from-rose-400 to-pink-500 rounded-full blur opacity-30 animate-pulse"></div>
+            <div className="relative w-28 h-28 rounded-full bg-gradient-to-br from-rose-100 to-pink-100 flex items-center justify-center mx-auto shadow-xl ring-8 ring-white">
+              <MessageCircle className="h-12 w-12 text-rose-500" />
+            </div>
+            <div className="absolute -top-3 -right-3 animate-bounce" style={{ animationDuration: '2s' }}>
+              <Sparkles className="w-8 h-8 text-yellow-400 fill-yellow-400/20" />
+            </div>
           </div>
-          <div>
-            <h3 className="text-xl font-semibold text-foreground">Your Messages</h3>
-            <p className="text-muted-foreground text-sm mt-1.5 max-w-sm">
-              Select a conversation to start chatting
+          <div className="space-y-3">
+            <h3 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+              Your Messaging Board
+            </h3>
+            <p className="text-gray-500 text-[15px] leading-relaxed mx-auto max-w-[280px]">
+              Dive into conversations! Select a chat from the sidebar to connect with potential flatmates.
             </p>
+          </div>
+          <div className="pt-4 flex justify-center gap-2 text-sm text-gray-400">
+            <span className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full shadow-sm border border-gray-100">
+              <ShieldOff className="w-3.5 h-3.5" /> End-to-end secure
+            </span>
           </div>
         </div>
       </div>

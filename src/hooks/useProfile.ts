@@ -50,6 +50,8 @@ export interface SearchPreferences {
   age_max: number;
   location_search?: string;
   location_range_km?: number;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface UserProfile {
@@ -58,6 +60,7 @@ export interface UserProfile {
   email: string;
   phone?: string;
   age?: number;
+  date_of_birth?: string;
   gender?: string;
   city?: string;
   state?: string;
@@ -160,8 +163,11 @@ function mapApiToProfile(raw: any): any {
       description: flat.description ?? '',
       commonAmenities: Array.isArray(flat.common_amenities)
         ? flat.common_amenities
-            .map((ca: any) => (typeof ca === 'string' ? ca : ca.amenity?.name || ca.name))
-            .filter(Boolean)
+            .map((ca: any) => {
+              if (typeof ca === 'string') return { name: ca, icon_name: '' };
+              return { name: ca.amenity?.name || ca.name, icon_name: ca.amenity?.icon_name || ca.icon_name || '' };
+            })
+            .filter((a: any) => Boolean(a.name))
         : [],
       commonPhotos: Array.isArray(flat.photos)
         ? flat.photos
@@ -182,8 +188,11 @@ function mapApiToProfile(raw: any): any {
         description: r.description ?? '',
         amenities: Array.isArray(r.room_amenities)
           ? r.room_amenities
-              .map((ra: any) => (typeof ra === 'string' ? ra : ra.amenity?.name || ra.name))
-              .filter(Boolean)
+              .map((ra: any) => {
+                if (typeof ra === 'string') return { name: ra, icon_name: '' };
+                return { name: ra.amenity?.name || ra.name, icon_name: ra.amenity?.icon_name || ra.icon_name || '' };
+              })
+              .filter((a: any) => Boolean(a.name))
           : [],
         photos: Array.isArray(r.photos)
           ? r.photos

@@ -41,6 +41,8 @@ interface BrandMultiSelectProps {
     mode?: "single" | "multiple";
     namePlaceholder?: string;
     aliasesPlaceholder?: string;
+    disabled?: boolean;
+    disabledMessage?: string;
 }
 
 export function BrandMultiSelect({
@@ -53,8 +55,10 @@ export function BrandMultiSelect({
     onSelectedValuesChange,
     onAddNewBrand,
     mode = "multiple",
-    namePlaceholder = "Google",
-    aliasesPlaceholder = "Ex: Google India, Alphabet",
+    namePlaceholder = "Enter brand name",
+    aliasesPlaceholder = "e.g., alias1, alias2",
+    disabled = false,
+    disabledMessage,
 }: BrandMultiSelectProps) {
     const [open, setOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
@@ -75,6 +79,7 @@ export function BrandMultiSelect({
     const [mediaError, setMediaError] = useState("");
 
     const handleSelect = (id: string) => {
+        if (disabled) return;
         if (mode === "single") {
             if (selectedValues.includes(id)) {
                 onSelectedValuesChange([]);
@@ -93,6 +98,7 @@ export function BrandMultiSelect({
 
     const handleRemove = (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
+        if (disabled) return;
         onSelectedValuesChange(selectedValues.filter((v) => v !== id));
     };
 
@@ -166,15 +172,16 @@ export function BrandMultiSelect({
                 </Label>
             )}
 
-            <Popover open={open} onOpenChange={setOpen}>
-                <PopoverTrigger asChild>
+            <Popover open={!disabled && open} onOpenChange={setOpen}>
+                <PopoverTrigger asChild disabled={disabled}>
                     <Button
                         variant="outline"
                         role="combobox"
                         aria-expanded={open}
                         className={cn(
                             "w-full justify-between px-3 py-2 hover:bg-transparent font-normal",
-                            mode === "single" ? "h-10" : "min-h-10 h-auto"
+                            mode === "single" ? "h-10" : "min-h-10 h-auto",
+                            disabled && "opacity-50 cursor-not-allowed"
                         )}
                     >
                         <div className={cn("flex gap-1 w-full max-w-full overflow-hidden text-left font-normal items-center", mode === "multiple" ? "flex-wrap" : "flex-nowrap truncate")}>
@@ -286,7 +293,15 @@ export function BrandMultiSelect({
                         <div className="p-1.5 bg-background border-t border-border/50 flex justify-center">
                             <button
                                 type="button"
-                                onClick={() => openAddModal(searchQuery)}
+                                onClick={() => {
+                                    if (disabled) {
+                                        if (disabledMessage) {
+                                            toast({ title: "Action Disabled", description: disabledMessage, variant: "destructive" });
+                                        }
+                                        return;
+                                    }
+                                    openAddModal(searchQuery);
+                                }}
                                 className="w-full text-left px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground font-normal flex items-center justify-between transition-colors cursor-pointer"
                             >
                                 <span className="flex items-center">

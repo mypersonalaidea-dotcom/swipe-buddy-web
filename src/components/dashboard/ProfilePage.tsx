@@ -216,7 +216,7 @@ export const ProfilePage = () => {
               r.security_deposit != null ? String(r.security_deposit) : "",
             brokerage: r.brokerage != null ? String(r.brokerage) : "",
             availableFrom: r.available_from ?? "",
-            amenities: r.room_amenities ?? [],
+            amenities: r.room_amenities?.map((a: any) => a.name || a) ?? [],
             media: (r.media && r.media.length > 0) 
               ? r.media.map((m, i) => ({
                   id: `room-media-${i}`,
@@ -231,7 +231,7 @@ export const ProfilePage = () => {
                   type: "image" as const,
                 })),
           })),
-          commonAmenities: apiFlat.common_amenities ?? [],
+          commonAmenities: apiFlat.common_amenities?.map((a: any) => a.name || a) ?? [],
           description: apiFlat.description ?? "",
           commonMedia: (apiFlat.media && apiFlat.media.length > 0)
             ? apiFlat.media.map((m, i) => ({
@@ -291,8 +291,11 @@ export const ProfilePage = () => {
         | "flatmate"
         | "both",
       propertyMoveInDate: apiProfile?.move_in_date ?? new Date().toISOString().split('T')[0],
-      searchLocation: apiProfile?.search_location ?? "",
-      searchRadius: apiProfile?.search_radius ?? 5,
+      searchLocation: apiProfile?.search_preferences?.location_search ?? "",
+      searchRadius: apiProfile?.search_preferences?.location_range_km ?? 5,
+      searchCoordinates: (apiProfile?.search_preferences?.longitude != null && apiProfile?.search_preferences?.latitude != null)
+        ? [Number(apiProfile.search_preferences.longitude), Number(apiProfile.search_preferences.latitude)] as [number, number]
+        : undefined,
       flatDetails,
       myHabits: (apiHabits ?? []).map((h) => h.habit.label),
     };
@@ -439,6 +442,21 @@ export const ProfilePage = () => {
   };
 
   const handleSave = async () => {
+    // Validation
+    const missingFields = [];
+    if (!editedProfile.name?.trim()) missingFields.push("Name");
+    if (!editedProfile.dob) missingFields.push("Date of Birth");
+    if (!editedProfile.gender) missingFields.push("Gender");
+    
+    if (missingFields.length > 0) {
+      toast({
+        title: "Missing Required Fields",
+        description: `Please fill out: ${missingFields.join(", ")}`,
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       // 1. Update basic profile fields
       await updateProfileMutation.mutateAsync({
@@ -560,6 +578,8 @@ export const ProfilePage = () => {
         await updateSearchPrefsMutation.mutateAsync({
           location_search: editedProfile.searchLocation,
           location_range_km: editedProfile.searchRadius ?? 5,
+          latitude: editedProfile.searchCoordinates?.[1],
+          longitude: editedProfile.searchCoordinates?.[0],
         });
       }
 
@@ -1539,8 +1559,12 @@ export const ProfilePage = () => {
                         </div>
                       ) : (
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-200/70 flex items-center justify-center flex-shrink-0">
-                            <Briefcase className="w-5 h-5 text-gray-400" />
+                          <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-50 border border-gray-200/70 flex items-center justify-center flex-shrink-0">
+                            {exp.companyLogo ? (
+                              <img src={exp.companyLogo} alt={exp.company} className="w-full h-full object-contain bg-white" />
+                            ) : (
+                              <Briefcase className="w-5 h-5 text-gray-400" />
+                            )}
                           </div>
                           <div>
                             <p className="text-[14px] font-bold text-gray-900">{exp.position}</p>
@@ -1652,8 +1676,12 @@ export const ProfilePage = () => {
                         </>
                       ) : (
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-200/70 flex items-center justify-center flex-shrink-0">
-                            <BookOpen className="w-5 h-5 text-gray-400" />
+                          <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-50 border border-gray-200/70 flex items-center justify-center flex-shrink-0">
+                            {edu.institutionLogo ? (
+                              <img src={edu.institutionLogo} alt={edu.institution || edu.degree} className="w-full h-full object-contain bg-white" />
+                            ) : (
+                              <BookOpen className="w-5 h-5 text-gray-400" />
+                            )}
                           </div>
                           <div>
                             <p className="text-[14px] font-bold text-gray-900">{edu.institution || edu.degree}</p>
@@ -2110,9 +2138,15 @@ export const ProfilePage = () => {
                                   )}
                                   {room.amenities.length > 0 && (
                                     <div className="flex flex-wrap gap-1 pt-1">
-                                      {room.amenities.map(amenity => (
-                                        <span key={amenity} className="px-2 py-0.5 bg-secondary/50 text-secondary-foreground rounded text-xs">{amenity}</span>
-                                      ))}
+                                      {(apiProfile?.flats?.[0]?.rooms?.[idx]?.room_amenities || []).map((amenity: any) => {
+                                        const name = amenity.name || amenity.amenity?.name || amenity;
+                                        const icon = amenity.icon_name || amenity.amenity?.icon_name || "";
+                                        return (
+                                          <span key={name} className="px-2 py-0.5 bg-secondary/50 text-secondary-foreground rounded text-xs">
+                                            {icon ? `${icon} ${name}` : name}
+                                          </span>
+                                        );
+                                      })}
                                     </div>
                                   )}
                                   {/* Room Media in view mode */}
@@ -2169,9 +2203,15 @@ export const ProfilePage = () => {
                         </div>
                       ) : (
                         <div className="flex flex-wrap gap-2">
-                          {data.flatDetails.commonAmenities.length > 0 ? data.flatDetails.commonAmenities.map(amenity => (
-                            <span key={amenity} className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">{amenity}</span>
-                          )) : (
+                          {(apiProfile?.flats?.[0]?.common_amenities || []).length > 0 ? (apiProfile?.flats?.[0]?.common_amenities || []).map((amenity: any) => {
+                            const name = amenity.name || amenity.amenity?.name || amenity;
+                            const icon = amenity.icon_name || amenity.amenity?.icon_name || "";
+                            return (
+                              <span key={name} className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
+                                {icon ? `${icon} ${name}` : name}
+                              </span>
+                            );
+                          }) : (
                             <p className="text-muted-foreground">No amenities listed</p>
                           )}
                         </div>
@@ -2345,11 +2385,17 @@ export const ProfilePage = () => {
                     {savedProfiles.map((savedProfile: any) => (
                       <div
                         key={savedProfile.id}
-                        className="group flex items-center gap-4 p-4 rounded-xl border border-gray-100 bg-white hover:border-rose-200/60 hover:shadow-md transition-all cursor-pointer"
+                        className="group relative flex items-center gap-4 p-4 pt-6 rounded-xl border border-gray-100 bg-white hover:border-rose-200/60 hover:shadow-md transition-all cursor-pointer"
                         onClick={() => {
                           setSearchParams({ profile: savedProfile.id, from: 'saved' });
                         }}
                       >
+                        <Badge
+                          variant={savedProfile.search_type === "flatmate" ? "default" : "secondary"}
+                          className="absolute top-2 right-2 text-[10px]"
+                        >
+                          {savedProfile.search_type === "flatmate" ? "Has Flat" : "Looking for Flat"}
+                        </Badge>
                         <div className="w-14 h-14 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 ring-1 ring-gray-200">
                           <img
                             src={savedProfile.profile_picture_url || "/placeholder.svg"}
@@ -2360,14 +2406,12 @@ export const ProfilePage = () => {
                         <div className="flex-1 min-w-0">
                           <p className="text-[14px] font-bold text-gray-900 truncate">{savedProfile.name}, {savedProfile.age}</p>
                           <p className="text-[12px] text-gray-500 truncate flex items-center gap-1">
-                            <MapPin className="w-3 h-3" /> {savedProfile.city}, {savedProfile.state}
+                            <MapPin className="w-3 h-3" /> {
+                              savedProfile.search_type === "flatmate" && savedProfile.flats?.[0]?.address
+                                ? savedProfile.flats[0].address
+                                : `${savedProfile.city}, ${savedProfile.state}`
+                            }
                           </p>
-                          <Badge
-                            variant={savedProfile.search_type === "flatmate" ? "default" : "secondary"}
-                            className="text-xs mt-1"
-                          >
-                            {savedProfile.search_type === "flatmate" ? "Has Flat" : "Looking for Flat"}
-                          </Badge>
                         </div>
                         <Button
                           variant="ghost"

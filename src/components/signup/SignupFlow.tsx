@@ -287,6 +287,7 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
         password: personalInfo.password,
         phone: personalInfo.phone,
         age: age || 0,
+        date_of_birth: personalInfo.dob || undefined,
         gender: personalInfo.gender,
         search_type: housingDetails.searchType,
         city: flatDetails.city || undefined,
@@ -350,6 +351,8 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
         await api.put("/profile/search-preferences", {
           location_search: housingDetails.searchLocation,
           location_range_km: housingDetails.searchRadius ?? 5,
+          latitude: housingDetails.searchCoordinates?.[1],
+          longitude: housingDetails.searchCoordinates?.[0],
         });
       }
 
