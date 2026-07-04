@@ -754,12 +754,15 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                                     <div>
                                       <p className="text-[10px] uppercase tracking-[0.1em] text-gray-400 font-bold mb-2">ROOM AMENITIES</p>
                                       <div className="flex flex-wrap gap-1.5">
-                                        {(room.amenities ?? []).map((a) => {
-                                          const AmenityIcon = getAmenityIcon(a);
+                                        {(room.amenities ?? []).map((a: any) => {
+                                          const name = typeof a === 'string' ? a : (a.name || a.amenity?.name || '');
+                                          const iconName = typeof a === 'string' ? '' : (a.icon_name || a.amenity?.icon_name || '');
+                                          const AmenityIcon = getAmenityIcon(name);
                                           return (
-                                            <span key={a} className="inline-flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-[11px] font-semibold rounded-lg px-2 sm:px-2.5 py-[3px] sm:py-[5px] bg-gradient-to-b from-white to-gray-50 text-gray-700 border border-gray-200/80 shadow-[0_1px_2px_hsl(220_13%_91%/0.5)]">
+                                            <span key={name} className="inline-flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-[11px] font-semibold rounded-lg px-2 sm:px-2.5 py-[3px] sm:py-[5px] bg-gradient-to-b from-white to-gray-50 text-gray-700 border border-gray-200/80 shadow-[0_1px_2px_hsl(220_13%_91%/0.5)]">
                                               {AmenityIcon && <AmenityIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-rose-400" />}
-                                              {a}
+                                              {iconName && <span className="mr-1">{iconName}</span>}
+                                              {name}
                                             </span>
                                           );
                                         })}
@@ -808,12 +811,15 @@ export const ProfileCard = ({ profile, alreadyInConversation, onSaveProfile, isS
                 </h3>
                 {(profile.flatDetails?.commonAmenities?.length ?? 0) > 0 && (
                   <div className="flex flex-wrap gap-1.5">
-                    {(profile.flatDetails?.commonAmenities ?? []).map((a) => {
-                      const AmenityIcon = getAmenityIcon(a);
+                    {(profile.flatDetails?.commonAmenities ?? []).map((a: any) => {
+                      const name = typeof a === 'string' ? a : (a.name || a.amenity?.name || '');
+                      const iconName = typeof a === 'string' ? '' : (a.icon_name || a.amenity?.icon_name || '');
+                      const AmenityIcon = getAmenityIcon(name);
                       return (
-                        <span key={a} className="inline-flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-[11px] font-semibold rounded-lg px-2 sm:px-2.5 py-[3px] sm:py-[5px] bg-gradient-to-b from-white to-gray-50 text-gray-700 border border-gray-200/80 shadow-[0_1px_2px_hsl(220_13%_91%/0.5)]">
+                        <span key={name} className="inline-flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-[11px] font-semibold rounded-lg px-2 sm:px-2.5 py-[3px] sm:py-[5px] bg-gradient-to-b from-white to-gray-50 text-gray-700 border border-gray-200/80 shadow-[0_1px_2px_hsl(220_13%_91%/0.5)]">
                           {AmenityIcon && <AmenityIcon className="w-3.5 h-3.5 text-rose-400" />}
-                          {a}
+                          {iconName && <span className="mr-1">{iconName}</span>}
+                          {name}
                         </span>
                       );
                     })}
