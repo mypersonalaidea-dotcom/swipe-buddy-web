@@ -61,6 +61,7 @@ export interface UserProfile {
   phone?: string;
   age?: number;
   date_of_birth?: string;
+  address?: string;
   gender?: string;
   city?: string;
   state?: string;
@@ -204,10 +205,25 @@ function mapApiToProfile(raw: any): any {
     };
   }
 
+  // ── Age: use raw.age if present, otherwise compute from date_of_birth ──
+  let computedAge = raw.age;
+  if (!computedAge && (raw.date_of_birth || raw.dob)) {
+    const dobStr = raw.date_of_birth || raw.dob;
+    const dobDate = new Date(dobStr);
+    if (!isNaN(dobDate.getTime())) {
+      const today = new Date();
+      let calc = today.getFullYear() - dobDate.getFullYear();
+      const m = today.getMonth() - dobDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < dobDate.getDate())) calc--;
+      computedAge = calc;
+    }
+  }
+
   return {
     // Pass through all raw fields so other consumers still work
     ...raw,
     // Override with ProfileCard-compatible keys
+    age: computedAge,
     profilePicture: raw.profile_picture_url ?? '',
     searchType: (raw.search_type === 'flatmate' || raw.search_type === 'both' || (Array.isArray(raw.flats) && raw.flats.length > 0))
       ? 'flatmate'

@@ -42,6 +42,24 @@ const PublicProfile = () => {
   const searchPrefs = profile.search_preferences;
   const flats = profile.flats || [];
 
+  // Compute age from date_of_birth as an additional fallback (mapApiToProfile already does this,
+  // but being defensive here in case profile was fetched without going through the mapper)
+  let displayAge = profile.age;
+  if (!displayAge && (profile.date_of_birth || profile.dob)) {
+    const dobStr = profile.date_of_birth || profile.dob;
+    const dob = new Date(dobStr);
+    if (!isNaN(dob.getTime())) {
+      const today = new Date();
+      let calc = today.getFullYear() - dob.getFullYear();
+      const m = today.getMonth() - dob.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) calc--;
+      displayAge = calc;
+    }
+  }
+
+  // Display location: prefer city+state, fallback to user address
+  const hasLocation = profile.city || profile.address;
+
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-2xl mx-auto space-y-6">
@@ -67,28 +85,44 @@ const PublicProfile = () => {
                     <User className="w-12 h-12 text-muted-foreground" />
                   )}
                 </div>
-                {profile.email_verified && (
-                  <div className="absolute bottom-1 right-1 bg-white rounded-full p-1 shadow-md z-20">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-500 fill-emerald-50" />
-                  </div>
-                )}
+                {/* Verification badges — stacked on the avatar */}
+                <div className="absolute bottom-0 right-0 flex flex-col gap-0.5 z-20">
+                  {(profile.phone_verified || profile.email_verified) && (
+                    <div className="bg-white rounded-full p-1 shadow-md">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-500 fill-emerald-50" />
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="flex-1 text-center md:text-left space-y-2">
                 <div className="flex items-center justify-center md:justify-start gap-2">
                   <h1 className="text-3xl font-extrabold text-foreground tracking-tight">{profile.name}</h1>
                 </div>
                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-2 text-muted-foreground">
-                  {profile.city && (
+                  {hasLocation && (
                     <p className="flex items-center gap-1.5 font-medium">
                       <MapPin className="w-4 h-4 text-rose-500" />
-                      {profile.city}{profile.state ? `, ${profile.state}` : ""}
+                      {profile.city
+                        ? `${profile.city}${profile.state ? `, ${profile.state}` : ""}`
+                        : profile.address}
                     </p>
                   )}
-                  {profile.age && (
+                  {displayAge && (
                     <p className="flex items-center gap-1.5 font-medium">
                       <Activity className="w-4 h-4 text-rose-500" />
-                      {profile.age} years · {profile.gender}
+                      {displayAge} years{profile.gender ? ` · ${profile.gender}` : ""}
                     </p>
+                  )}
+                  {/* Verification pills */}
+                  {profile.phone_verified && (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-full">
+                      <CheckCircle2 className="w-3 h-3" /> Phone Verified
+                    </span>
+                  )}
+                  {profile.email_verified && (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-full">
+                      <CheckCircle2 className="w-3 h-3" /> Email Verified
+                    </span>
                   )}
                 </div>
                 <div className="flex flex-wrap justify-center md:justify-start gap-2 pt-2">

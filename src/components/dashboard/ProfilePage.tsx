@@ -270,6 +270,7 @@ export const ProfilePage = () => {
       emailVerified: apiProfile?.email_verified ?? false,
       city: apiProfile?.city ?? "",
       state: apiProfile?.state ?? "",
+      address: (apiProfile as any)?.address ?? "",
       profilePictureUrl: apiProfile?.profile_picture_url ?? "",
       jobExperiences: (apiJobs ?? []).map((j) => ({
         id: j.id,
@@ -466,6 +467,7 @@ export const ProfilePage = () => {
         gender: editedProfile.gender as any,
         city: editedProfile.city,
         state: editedProfile.state,
+        address: (editedProfile as any).address || undefined,
         search_type: editedProfile.searchType as any,
         move_in_date: editedProfile.propertyMoveInDate || undefined,
       } as any);

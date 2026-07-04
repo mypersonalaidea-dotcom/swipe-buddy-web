@@ -292,6 +292,8 @@ export const SignupFlow = ({ onComplete, onSwitchToLogin }: SignupFlowProps = {}
         search_type: housingDetails.searchType,
         city: flatDetails.city || undefined,
         state: flatDetails.state || undefined,
+        // Save the user-level address: prefer flat address, fallback to search location
+        address: flatDetails.address || housingDetails.searchLocation || undefined,
         profile_picture_url: profilePictureUrl,
         flat_details,
         whatsapp_notifications: personalInfo.whatsappNotifications,
