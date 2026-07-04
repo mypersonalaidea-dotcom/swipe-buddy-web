@@ -62,7 +62,12 @@ export const useDiscoverFeed = (page = 1, limit = 3) => {
       const res = await api.get("/discover/feed", {
         params: { page, limit },
       });
-      return res.data.data;
+      // Handle both { data: { cards, pagination } } and { cards, pagination } response shapes
+      const raw = res.data?.data ?? res.data;
+      return {
+        cards: Array.isArray(raw?.cards) ? raw.cards : (Array.isArray(raw) ? raw : []),
+        pagination: raw?.pagination ?? { page, limit, totalCards: 0, totalPages: 0, hasMore: false },
+      };
     },
     staleTime: 0, // Always re-fetch to get fresh unvisited profiles
   });

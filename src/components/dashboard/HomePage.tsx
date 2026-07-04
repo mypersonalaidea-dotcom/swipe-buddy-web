@@ -262,7 +262,8 @@ export const HomePage = () => {
   // Update feedExhausted state when discover data changes
   useEffect(() => {
     if (discoverData) {
-      setFeedExhausted(discoverData.cards.length === 0 && !discoverData.pagination.hasMore);
+      // Treat as exhausted if no cards returned (regardless of hasMore, as a resilience measure)
+      setFeedExhausted(discoverData.cards.length === 0);
     }
   }, [discoverData]);
 
@@ -1678,8 +1679,28 @@ export const HomePage = () => {
               )}
             </div>
           ) : (
-            <div className="flex flex-col items-center gap-3 text-muted-foreground">
-              <p className="text-sm">No listings found. Check back soon!</p>
+            <div className="flex flex-col items-center gap-5 text-center max-w-sm">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-rose-100 to-rose-200 flex items-center justify-center">
+                <Heart className="w-10 h-10 text-rose-400" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-foreground">No profiles yet!</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  You've seen all available profiles for now. Reset your feed to browse them again.
+                </p>
+              </div>
+              <Button
+                onClick={handleResetFeed}
+                disabled={isClearingVisited}
+                className="gap-2 px-6 py-2.5 rounded-full shadow-md bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white font-medium transition-all"
+              >
+                {isClearingVisited ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+                Reset Feed
+              </Button>
             </div>
           )}
         </div>
