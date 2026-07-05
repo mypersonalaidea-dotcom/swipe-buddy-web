@@ -37,7 +37,7 @@ interface BrandMultiSelectProps {
     options: BrandOption[];
     selectedValues: string[];
     onSelectedValuesChange: (values: string[]) => void;
-    onAddNewBrand: (brand: Omit<BrandOption, "id"> & { logoFile?: File }) => void;
+    onAddNewBrand: (brand: Omit<BrandOption, "id"> & { logoFile?: File, aliases: string[] }) => void | Promise<void>;
     mode?: "single" | "multiple";
     namePlaceholder?: string;
     aliasesPlaceholder?: string;
@@ -77,6 +77,7 @@ export function BrandMultiSelect({
     const [addMedia, setAddMedia] = useState<any[]>([]);
     const [nameError, setNameError] = useState("");
     const [mediaError, setMediaError] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleSelect = (id: string) => {
         if (disabled) return;
@@ -113,7 +114,7 @@ export function BrandMultiSelect({
         setIsAddModalOpen(true);
     };
 
-    const handleAddSubmit = () => {
+    const handleAddSubmit = async () => {
         // Validation
         let hasError = false;
 
@@ -150,17 +151,28 @@ export function BrandMultiSelect({
             logoFile: addMedia.length > 0 ? addMedia[0].file : undefined,
         };
 
-        onAddNewBrand(newBrand);
-        toast({
-            title: "✨ Added to DB!",
-            description: (
-                <>
-                    Sweet, you just added {newBrand.name}.<br />
-                    Thanks for keeping our community updated!
-                </>
-            ),
-        });
-        setIsAddModalOpen(false);
+        setIsSubmitting(true);
+        try {
+            await onAddNewBrand(newBrand);
+            toast({
+                title: "✨ Added to DB!",
+                description: (
+                    <>
+                        Sweet, you just added {newBrand.name}.<br />
+                        Thanks for keeping our community updated!
+                    </>
+                ),
+            });
+            setIsAddModalOpen(false);
+        } catch (error: any) {
+            toast({
+                title: "Failed to add",
+                description: error.message || "An error occurred while adding.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -377,11 +389,11 @@ export function BrandMultiSelect({
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsAddModalOpen(false)}>
+                        <Button variant="outline" onClick={() => setIsAddModalOpen(false)} disabled={isSubmitting}>
                             Cancel
                         </Button>
-                        <Button variant="gradient" onClick={handleAddSubmit}>
-                            Save to DB
+                        <Button variant="gradient" onClick={handleAddSubmit} disabled={isSubmitting}>
+                            {isSubmitting ? "Saving..." : "Save to DB"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

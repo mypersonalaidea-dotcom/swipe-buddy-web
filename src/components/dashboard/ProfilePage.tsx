@@ -47,6 +47,7 @@ import {
   usePublicProfile
 } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
+import { uploadToCloudinary } from "@/lib/cloudinary";
 import { useFlats, useUpdateFlat } from "@/hooks/useFlats";
 import { useCompanies, usePositions, useInstitutions, useDegrees } from "@/hooks/useMasterData";
 import { useSavedProfiles, useSaveProfile } from "@/hooks/useSocial";
@@ -1506,10 +1507,22 @@ export const ProfilePage = () => {
                               const val = vals.length > 0 ? vals[0] : "";
                               updateJobExperience(exp.id, 'company', val);
                             }}
-                            onAddNewBrand={(brand) => {
-                              const newBrand = { ...brand, id: brand.name };
+                            onAddNewBrand={async (brand) => {
+                              let logo_url = null;
+                              if (brand.logoFile) {
+                                const res = await uploadToCloudinary(brand.logoFile, "companies");
+                                logo_url = res.secure_url;
+                              }
+                              const res = await api.post("/master/companies", {
+                                name: brand.name,
+                                logo_url,
+                                aliases: brand.aliases,
+                              });
+                              const newCompany = res.data.data;
+                              const newBrand = { id: newCompany.id, name: newCompany.name, logo: newCompany.logo_url };
                               setCompaniesDb((prev) => [...prev, newBrand]);
                               updateJobExperience(exp.id, 'company', newBrand.id);
+                              updateJobExperience(exp.id, 'companyLogo', newBrand.logo);
                             }}
                           />
                           <div className="space-y-1">
@@ -1632,10 +1645,22 @@ export const ProfilePage = () => {
                                 const val = vals.length > 0 ? vals[0] : "";
                                 updateEducation(edu.id, 'institution', val);
                               }}
-                              onAddNewBrand={(brand) => {
-                                const newBrand = { ...brand, id: brand.name };
+                              onAddNewBrand={async (brand) => {
+                                let logo_url = null;
+                                if (brand.logoFile) {
+                                  const res = await uploadToCloudinary(brand.logoFile, "institutions");
+                                  logo_url = res.secure_url;
+                                }
+                                const res = await api.post("/master/institutions", {
+                                  name: brand.name,
+                                  logo_url,
+                                  aliases: brand.aliases,
+                                });
+                                const newInstitution = res.data.data;
+                                const newBrand = { id: newInstitution.id, name: newInstitution.name, logo: newInstitution.logo_url };
                                 setSchoolsDb((prev) => [...prev, newBrand]);
                                 updateEducation(edu.id, 'institution', newBrand.id);
+                                updateEducation(edu.id, 'institutionLogo', newBrand.logo);
                               }}
                             />
                             <div className="space-y-1">
