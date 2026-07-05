@@ -58,6 +58,7 @@ interface JobExperience {
   fromYear: string;
   tillYear: string;
   currentlyWorking: boolean;
+  companyLogo?: string;
 }
 
 interface EducationExperience {
@@ -66,6 +67,7 @@ interface EducationExperience {
   degree: string;
   startYear: string;
   endYear: string;
+  institutionLogo?: string;
 }
 
 interface MediaFile {
@@ -279,6 +281,7 @@ export const ProfilePage = () => {
         fromYear: j.from_year ?? "",
         tillYear: j.till_year ?? "",
         currentlyWorking: j.currently_working,
+        companyLogo: j.company?.logo_url ?? "",
       })),
       educationExperiences: (apiEducation ?? []).map((e) => ({
         id: e.id,
@@ -286,6 +289,7 @@ export const ProfilePage = () => {
         degree: e.degree?.common_name ?? e.degree_name ?? "",
         startYear: e.start_year ?? "",
         endYear: e.end_year ?? "",
+        institutionLogo: e.institution?.logo_url ?? "",
       })),
       searchType: (apiProfile?.search_type ?? "flat") as
         | "flat"
