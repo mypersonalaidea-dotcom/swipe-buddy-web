@@ -488,10 +488,16 @@ export const ProfilePage = () => {
       }
       // Update existing jobs
       for (const j of editedProfile.jobExperiences.filter(j => origJobIds.includes(j.id))) {
+        const cId = companiesDb.find(c => c.id === j.company)?.id;
+        const cName = !cId ? j.company : undefined;
+        const pId = masterPositions.find(p => p.full_name === j.position)?.id;
+        const pName = !pId ? j.position : undefined;
         await updateJobMutation.mutateAsync({
           jobId: j.id,
-          company_name: j.company || undefined,
-          position_name: j.position || undefined,
+          company_id: cId,
+          company_name: cName,
+          position_id: pId,
+          position_name: pName,
           from_year: j.fromYear || undefined,
           till_year: j.currentlyWorking ? undefined : (j.tillYear || undefined),
           currently_working: j.currentlyWorking,
@@ -500,9 +506,15 @@ export const ProfilePage = () => {
       // Add new jobs
       for (const j of editedProfile.jobExperiences.filter(j => !origJobIds.includes(j.id))) {
         if (j.company || j.position) {
+          const cId = companiesDb.find(c => c.id === j.company)?.id;
+          const cName = !cId ? j.company : undefined;
+          const pId = masterPositions.find(p => p.full_name === j.position)?.id;
+          const pName = !pId ? j.position : undefined;
           await addJobMutation.mutateAsync({
-            company_name: j.company || undefined,
-            position_name: j.position || undefined,
+            company_id: cId,
+            company_name: cName,
+            position_id: pId,
+            position_name: pName,
             from_year: j.fromYear || undefined,
             till_year: j.currentlyWorking ? undefined : (j.tillYear || undefined),
             currently_working: j.currentlyWorking,
@@ -518,19 +530,31 @@ export const ProfilePage = () => {
         }
       }
       for (const e of editedProfile.educationExperiences.filter(e => origEduIds.includes(e.id))) {
+        const iId = schoolsDb.find(s => s.id === e.institution)?.id;
+        const iName = !iId ? e.institution : undefined;
+        const dId = masterDegrees.find(d => d.full_name === e.degree)?.id;
+        const dName = !dId ? e.degree : undefined;
         await updateEduMutation.mutateAsync({
           eduId: e.id,
-          institution_name: e.institution || undefined,
-          degree_name: e.degree || undefined,
+          institution_id: iId,
+          institution_name: iName,
+          degree_id: dId,
+          degree_name: dName,
           start_year: e.startYear || undefined,
           end_year: e.endYear || undefined,
         });
       }
       for (const e of editedProfile.educationExperiences.filter(e => !origEduIds.includes(e.id))) {
         if (e.institution || e.degree) {
+          const iId = schoolsDb.find(s => s.id === e.institution)?.id;
+          const iName = !iId ? e.institution : undefined;
+          const dId = masterDegrees.find(d => d.full_name === e.degree)?.id;
+          const dName = !dId ? e.degree : undefined;
           await addEduMutation.mutateAsync({
-            institution_name: e.institution || undefined,
-            degree_name: e.degree || undefined,
+            institution_id: iId,
+            institution_name: iName,
+            degree_id: dId,
+            degree_name: dName,
             start_year: e.startYear || undefined,
             end_year: e.endYear || undefined,
           });
