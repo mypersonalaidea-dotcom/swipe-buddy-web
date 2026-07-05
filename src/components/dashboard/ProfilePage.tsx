@@ -610,7 +610,7 @@ export const ProfilePage = () => {
   };
 
   const updateField = (field: keyof UserProfile, value: any) => {
-    setEditedProfile({ ...editedProfile, [field]: value });
+    setEditedProfile(prev => ({ ...prev, [field]: value }));
   };
 
   const addJobExperience = () => {
