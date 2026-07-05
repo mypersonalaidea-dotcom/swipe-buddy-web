@@ -54,8 +54,10 @@ import { useSavedProfiles, useSaveProfile } from "@/hooks/useSocial";
 
 interface JobExperience {
   id: string;
-  company: string;
-  position: string;
+  company: string;     // display name
+  companyId?: string;  // master DB id (UUID) – set when a master entry is selected
+  position: string;    // display name
+  positionId?: string; // master DB id
   fromYear: string;
   tillYear: string;
   currentlyWorking: boolean;
@@ -64,8 +66,10 @@ interface JobExperience {
 
 interface EducationExperience {
   id: string;
-  institution: string;
-  degree: string;
+  institution: string;     // display name
+  institutionId?: string;  // master DB id
+  degree: string;          // display name
+  degreeId?: string;       // master DB id
   startYear: string;
   endYear: string;
   institutionLogo?: string;
@@ -278,7 +282,9 @@ export const ProfilePage = () => {
       jobExperiences: (apiJobs ?? []).map((j) => ({
         id: j.id,
         company: j.company?.name ?? j.company_name ?? "",
+        companyId: j.company_id ?? undefined,
         position: j.position?.full_name ?? j.position_name ?? "",
+        positionId: j.position_id ?? undefined,
         fromYear: j.from_year ?? "",
         tillYear: j.till_year ?? "",
         currentlyWorking: j.currently_working,
@@ -287,7 +293,9 @@ export const ProfilePage = () => {
       educationExperiences: (apiEducation ?? []).map((e) => ({
         id: e.id,
         institution: e.institution?.name ?? e.institution_name ?? "",
+        institutionId: e.institution_id ?? undefined,
         degree: e.degree?.common_name ?? e.degree_name ?? "",
+        degreeId: e.degree_id ?? undefined,
         startYear: e.start_year ?? "",
         endYear: e.end_year ?? "",
         institutionLogo: e.institution?.logo_url ?? "",
@@ -488,10 +496,12 @@ export const ProfilePage = () => {
       }
       // Update existing jobs
       for (const j of editedProfile.jobExperiences.filter(j => origJobIds.includes(j.id))) {
-        const cId = companiesDb.find(c => c.id === j.company)?.id;
-        const cName = !cId ? j.company : undefined;
-        const pId = masterPositions.find(p => p.full_name === j.position)?.id;
-        const pName = !pId ? j.position : undefined;
+        // j.companyId is set when a master company was selected from dropdown
+        // j.company holds the display name (set on load or manual entry)
+        const cId = j.companyId || undefined;
+        const cName = cId ? undefined : (j.company || undefined);
+        const pId = j.positionId || undefined;
+        const pName = pId ? undefined : (j.position || undefined);
         await updateJobMutation.mutateAsync({
           jobId: j.id,
           company_id: cId,
@@ -506,10 +516,10 @@ export const ProfilePage = () => {
       // Add new jobs
       for (const j of editedProfile.jobExperiences.filter(j => !origJobIds.includes(j.id))) {
         if (j.company || j.position) {
-          const cId = companiesDb.find(c => c.id === j.company)?.id;
-          const cName = !cId ? j.company : undefined;
-          const pId = masterPositions.find(p => p.full_name === j.position)?.id;
-          const pName = !pId ? j.position : undefined;
+          const cId = j.companyId || undefined;
+          const cName = cId ? undefined : (j.company || undefined);
+          const pId = j.positionId || undefined;
+          const pName = pId ? undefined : (j.position || undefined);
           await addJobMutation.mutateAsync({
             company_id: cId,
             company_name: cName,
@@ -530,10 +540,10 @@ export const ProfilePage = () => {
         }
       }
       for (const e of editedProfile.educationExperiences.filter(e => origEduIds.includes(e.id))) {
-        const iId = schoolsDb.find(s => s.id === e.institution)?.id;
-        const iName = !iId ? e.institution : undefined;
-        const dId = masterDegrees.find(d => d.full_name === e.degree)?.id;
-        const dName = !dId ? e.degree : undefined;
+        const iId = e.institutionId || undefined;
+        const iName = iId ? undefined : (e.institution || undefined);
+        const dId = e.degreeId || undefined;
+        const dName = dId ? undefined : (e.degree || undefined);
         await updateEduMutation.mutateAsync({
           eduId: e.id,
           institution_id: iId,
@@ -546,10 +556,10 @@ export const ProfilePage = () => {
       }
       for (const e of editedProfile.educationExperiences.filter(e => !origEduIds.includes(e.id))) {
         if (e.institution || e.degree) {
-          const iId = schoolsDb.find(s => s.id === e.institution)?.id;
-          const iName = !iId ? e.institution : undefined;
-          const dId = masterDegrees.find(d => d.full_name === e.degree)?.id;
-          const dName = !dId ? e.degree : undefined;
+          const iId = e.institutionId || undefined;
+          const iName = iId ? undefined : (e.institution || undefined);
+          const dId = e.degreeId || undefined;
+          const dName = dId ? undefined : (e.degree || undefined);
           await addEduMutation.mutateAsync({
             institution_id: iId,
             institution_name: iName,
@@ -1525,11 +1535,14 @@ export const ProfilePage = () => {
                             dialogLabel="Company"
                             placeholder="Select Company..."
                             options={companiesDb}
-                            selectedValues={exp.company ? [exp.company] : []}
+                            selectedValues={exp.companyId ? [exp.companyId] : []}
                             mode="single"
                             onSelectedValuesChange={(vals) => {
-                              const val = vals.length > 0 ? vals[0] : "";
-                              updateJobExperience(exp.id, 'company', val);
+                              const selectedId = vals.length > 0 ? vals[0] : "";
+                              const found = companiesDb.find(c => c.id === selectedId);
+                              updateJobExperience(exp.id, 'companyId', selectedId || undefined);
+                              updateJobExperience(exp.id, 'company', found?.name ?? "");
+                              updateJobExperience(exp.id, 'companyLogo', found?.logo ?? "");
                             }}
                             onAddNewBrand={async (brand) => {
                               let logo_url = null;
@@ -1545,7 +1558,8 @@ export const ProfilePage = () => {
                               const newCompany = res.data.data;
                               const newBrand = { id: newCompany.id, name: newCompany.name, logo: newCompany.logo_url };
                               setCompaniesDb((prev) => [...prev, newBrand]);
-                              updateJobExperience(exp.id, 'company', newBrand.id);
+                              updateJobExperience(exp.id, 'companyId', newBrand.id);
+                              updateJobExperience(exp.id, 'company', newBrand.name);
                               updateJobExperience(exp.id, 'companyLogo', newBrand.logo);
                             }}
                           />
@@ -1555,6 +1569,8 @@ export const ProfilePage = () => {
                               value={positionOptions.includes(exp.position) && exp.position !== "Other" ? exp.position : ""}
                               onValueChange={(val) => {
                                 if (val !== "Other") {
+                                  const found = masterPositions.find(p => p.full_name === val);
+                                  updateJobExperience(exp.id, 'positionId', found?.id ?? undefined);
                                   updateJobExperience(exp.id, 'position', val);
                                 } else {
                                   setActiveJobIdForPosition(exp.id);
@@ -1663,11 +1679,14 @@ export const ProfilePage = () => {
                               aliasesPlaceholder="Ex: abc, xyz"
                               placeholder="Select Institution..."
                               options={schoolsDb}
-                              selectedValues={edu.institution ? [edu.institution] : []}
+                              selectedValues={edu.institutionId ? [edu.institutionId] : []}
                               mode="single"
                               onSelectedValuesChange={(vals) => {
-                                const val = vals.length > 0 ? vals[0] : "";
-                                updateEducation(edu.id, 'institution', val);
+                                const selectedId = vals.length > 0 ? vals[0] : "";
+                                const found = schoolsDb.find(s => s.id === selectedId);
+                                updateEducation(edu.id, 'institutionId', selectedId || undefined);
+                                updateEducation(edu.id, 'institution', found?.name ?? "");
+                                updateEducation(edu.id, 'institutionLogo', found?.logo ?? "");
                               }}
                               onAddNewBrand={async (brand) => {
                                 let logo_url = null;
@@ -1683,7 +1702,8 @@ export const ProfilePage = () => {
                                 const newInstitution = res.data.data;
                                 const newBrand = { id: newInstitution.id, name: newInstitution.name, logo: newInstitution.logo_url };
                                 setSchoolsDb((prev) => [...prev, newBrand]);
-                                updateEducation(edu.id, 'institution', newBrand.id);
+                                updateEducation(edu.id, 'institutionId', newBrand.id);
+                                updateEducation(edu.id, 'institution', newBrand.name);
                                 updateEducation(edu.id, 'institutionLogo', newBrand.logo);
                               }}
                             />
@@ -1693,6 +1713,8 @@ export const ProfilePage = () => {
                                 value={degreeOptions.includes(edu.degree) && edu.degree !== "Other" ? edu.degree : ""}
                                 onValueChange={(val) => {
                                   if (val !== "Other") {
+                                    const found = masterDegrees.find(d => d.common_name === val);
+                                    updateEducation(edu.id, 'degreeId', found?.id ?? undefined);
                                     updateEducation(edu.id, 'degree', val);
                                   } else {
                                     setActiveEducationId(edu.id);
